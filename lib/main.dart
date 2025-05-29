@@ -9,6 +9,7 @@ import 'package:cmc_ev/db/SupabaseConfig.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await SupabaseConfig.initialize();
+  // hello 
   // Initialize the Supabase client
 
   runApp(const MyApp());
