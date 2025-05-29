@@ -10,12 +10,60 @@ class CreateEventScreen extends StatefulWidget {
 class _CreateEventScreenState extends State<CreateEventScreen> {
   final _formKey = GlobalKey<FormState>();
   bool _isFree = true;
+  final _titleController = TextEditingController();
+  final _descriptionController = TextEditingController();
+  final _promptController = TextEditingController();
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _descriptionController.dispose();
+    _promptController.dispose();
+    super.dispose();
+  }
+
+  void _showAIGeneratorDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Générateur IA'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: _promptController,
+              decoration: const InputDecoration(
+                labelText: 'Description pour la génération',
+                border: OutlineInputBorder(),
+              ),
+              maxLines: 3,
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: () {
+                  // TODO: Générer le titre, la description et l'image
+                  Navigator.pop(context);
+                },
+                child: const Text('Générer'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Créer un événement'),
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _showAIGeneratorDialog,
+        child: const Icon(Icons.auto_awesome),
       ),
       body: Form(
         key: _formKey,
@@ -25,6 +73,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
             _ImagePicker(),
             const SizedBox(height: 16),
             TextFormField(
+              controller: _titleController,
               decoration: const InputDecoration(
                 labelText: 'Titre de l\'événement',
                 border: OutlineInputBorder(),
@@ -38,6 +87,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
             ),
             const SizedBox(height: 16),
             TextFormField(
+              controller: _descriptionController,
               decoration: const InputDecoration(
                 labelText: 'Description',
                 border: OutlineInputBorder(),
@@ -119,6 +169,26 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                 });
               },
             ),
+            if (!_isFree) ...[  // Afficher le champ de prix uniquement si l'événement n'est pas gratuit
+              const SizedBox(height: 16),
+              TextFormField(
+                decoration: const InputDecoration(
+                  labelText: 'Prix du billet',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.euro),
+                ),
+                keyboardType: TextInputType.numberWithOptions(decimal: true),
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Veuillez entrer un prix';
+                  }
+                  if (double.tryParse(value) == null) {
+                    return 'Veuillez entrer un nombre valide';
+                  }
+                  return null;
+                },
+              ),
+            ],
             const SizedBox(height: 24),
             FilledButton(
               onPressed: () {

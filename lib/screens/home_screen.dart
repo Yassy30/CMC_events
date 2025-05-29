@@ -449,7 +449,7 @@ class CommentTile extends StatelessWidget {
       padding: const EdgeInsets.only(right: 8.0),
       child: Chip(
         label: Text(label),
-        backgroundColor: isSelected ? Colors.blue : Colors.grey[200],
+        backgroundColor: isSelected ? Color(0xFF37A2BC) : Colors.grey[200],
         labelStyle: TextStyle(
           color: isSelected ? Colors.white : Colors.black,
         ),

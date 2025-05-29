@@ -1,4 +1,5 @@
 import 'package:cmc_ev/navigation/bottom_navigation.dart';
+import 'package:cmc_ev/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:cmc_ev/screens/home_screen.dart';
 
@@ -24,7 +25,7 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).colorScheme.primary,
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -33,7 +34,8 @@ class _SplashScreenState extends State<SplashScreen> {
               'IN\'CMC',
               style: Theme.of(context).textTheme.headlineLarge?.copyWith(
                     fontWeight: FontWeight.bold,
-                    color: Theme.of(context).colorScheme.primary,
+                    fontSize: 50,
+                    color: Colors.white,
                   ),
             ),
           ],
