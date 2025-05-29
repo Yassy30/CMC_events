@@ -1,31 +1,25 @@
-class Comment {
+class Report {
   final String id;
   final String eventId;
   final String userId;
-  final String text;
+  final String reason;
   final DateTime createdAt;
-  final String username;
-  final String? userImageUrl;
 
-  Comment({
+  Report({
     required this.id,
     required this.eventId,
     required this.userId,
-    required this.text,
+    required this.reason,
     required this.createdAt,
-    required this.username,
-    this.userImageUrl,
   });
 
-  factory Comment.fromMap(Map<String, dynamic> data) {
-    return Comment(
+  factory Report.fromMap(Map<String, dynamic> data) {
+    return Report(
       id: data['id'],
       eventId: data['event_id'],
       userId: data['user_id'],
-      text: data['content'],
+      reason: data['reason'],
       createdAt: DateTime.parse(data['created_at']),
-      username: data['username'] ?? 'Unknown',
-      userImageUrl: data['profile_picture'],
     );
   }
 
@@ -34,7 +28,7 @@ class Comment {
       'id': id,
       'event_id': eventId,
       'user_id': userId,
-      'content': text,
+      'reason': reason,
       'created_at': createdAt.toIso8601String(),
     };
   }

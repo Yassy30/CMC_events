@@ -43,6 +43,11 @@ dev_dependencies:
     sdk: flutter
   supabase_flutter: ^2.0.0  # For Supabase integration
   flutter_dotenv: ^5.0.0   # For loading .env files
+  image_picker: ^1.1.2
+  provider: ^6.1.1  # or the latest version
+  share_plus: ^7.2.2
+  timeago: ^3.7.0
+
 
   # The "flutter_lints" package below contains a set of recommended lints to
   # encourage good coding practices. The lint set provided by the package is
