@@ -1,5 +1,7 @@
+import 'package:cmc_ev/models/comment.dart';
 import 'package:cmc_ev/models/event.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart'; // Added for DateFormat
 import 'package:share_plus/share_plus.dart';
 import 'package:timeago/timeago.dart' as timeago;
 
@@ -42,9 +44,9 @@ class HomeScreen extends StatelessWidget {
               child: Row(
                 children: [
                   _buildCategoryChip('All Events', true),
-                  _buildCategoryChip('Sport', false),
-                  _buildCategoryChip('Music', false),
-                  _buildCategoryChip('Art', false),
+                  _buildCategoryChip('sport', false),
+                  _buildCategoryChip('culture', false),
+                  _buildCategoryChip('competition', false),
                 ],
               ),
             ),
@@ -60,19 +62,34 @@ class HomeScreen extends StatelessWidget {
                       title: 'Workshop Flutter',
                       description: 'Apprenez à créer des applications mobiles avec Flutter',
                       imageUrl: 'https://example.com/image.jpg',
-                      date: DateTime.now().add(const Duration(days: 2)),
+                      startDate: DateTime.now().add(const Duration(days: 2)),
                       location: 'CMC Agadir - Salle 201',
                       maxAttendees: 30,
-                      currentAttendees: 15,
-                      organizerId: '123',
-                      isFree: true,
-                      category: 'Technology',
+                      creatorId: '123', // Placeholder for organizer
+                      category: 'technology',
+                      paymentType: 'free',
+                      isCompleted: false,
+                      createdAt: DateTime.now(),
+                      updatedAt: DateTime.now(),
                     ),
                   );
                 },
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCategoryChip(String label, bool isSelected) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 8.0),
+      child: Chip(
+        label: Text(label),
+        backgroundColor: isSelected ? const Color(0xFF37A2BC) : Colors.grey[200],
+        labelStyle: TextStyle(
+          color: isSelected ? Colors.white : Colors.black,
         ),
       ),
     );
@@ -95,15 +112,14 @@ class EventCard extends StatelessWidget {
         initialChildSize: 0.7,
         minChildSize: 0.5,
         maxChildSize: 0.95,
-        builder: (_, controller) => CommentsSection(event: event, controller: controller),
+        builder: (_, controller) => CommentsSection(eventId: event.id, controller: controller),
       ),
     );
   }
 
   void _shareEvent(BuildContext context) {
-    // Implement share functionality
     Share.share(
-      'Check out this event: ${event.title} at ${event.location} on ${event.date.toString()}',
+      'Join this event: ${event.title} at ${event.location ?? 'TBD'} on ${DateFormat('yyyy-MM-dd HH:mm').format(event.startDate)}! Category: ${event.category}',
     );
   }
 
@@ -119,14 +135,15 @@ class EventCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Event organizer header
+          // Event organizer header (using creatorId)
           Padding(
             padding: const EdgeInsets.all(8.0),
             child: Row(
               children: [
                 CircleAvatar(
                   radius: 20,
-                  backgroundImage: NetworkImage(event.organizerImageUrl ?? ''),
+                  // Placeholder: Fetch organizer image from users table using creatorId
+                  backgroundImage: const NetworkImage('https://example.com/organizer.jpg'),
                   onBackgroundImageError: (_, __) => const Icon(Icons.person),
                 ),
                 const SizedBox(width: 8),
@@ -135,11 +152,11 @@ class EventCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        event.organizerName ?? 'Stagiaire',
+                        'Organizer', // Placeholder: Fetch organizer name from users table
                         style: Theme.of(context).textTheme.titleSmall,
                       ),
                       Text(
-                        'Posted ${timeago.format(event.date)}',
+                        'Posted ${timeago.format(event.createdAt)}',
                         style: Theme.of(context).textTheme.bodySmall,
                       ),
                     ],
@@ -147,15 +164,14 @@ class EventCard extends StatelessWidget {
                 ),
                 TextButton(
                   onPressed: () {
-                    // Implement follow/unfollow logic
-                    // This should be handled by your state management solution
+                    // TODO: Implement follow/unfollow logic using creatorId
                   },
-                  child: Text(event.isFollowing ? 'Following' : 'Follow'),
+                  child: const Text('Follow'),
                 ),
               ],
             ),
           ),
-          // Image de l'événement
+          // Event Image
           AspectRatio(
             aspectRatio: 16 / 9,
             child: Image.network(
@@ -174,7 +190,7 @@ class EventCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Catégorie et Date
+                // Category and Date
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -186,43 +202,43 @@ class EventCard extends StatelessWidget {
                       ),
                     ),
                     Text(
-                      '${event.date.day}/${event.date.month}/${event.date.year}',
+                      DateFormat('dd/MM/yyyy').format(event.startDate),
                       style: Theme.of(context).textTheme.bodyMedium,
                     ),
                   ],
                 ),
                 const SizedBox(height: 8),
-                // Titre
+                // Title
                 Text(
                   event.title,
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
                 const SizedBox(height: 8),
-                // Localisation
+                // Location
                 Row(
                   children: [
                     const Icon(Icons.location_on, size: 16),
                     const SizedBox(width: 4),
                     Expanded(
                       child: Text(
-                        event.location,
+                        event.location ?? 'Location not specified',
                         style: Theme.of(context).textTheme.bodyMedium,
                       ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 8),
-                // Barre de progression des participants
+                // Attendees Progress
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '${event.currentAttendees}/${event.maxAttendees} participants',
+                      '0/${event.maxAttendees ?? 'Unlimited'} participants', // TODO: Fetch current attendees
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
                     const SizedBox(height: 4),
                     LinearProgressIndicator(
-                      value: event.currentAttendees / event.maxAttendees,
+                      value: 0, // TODO: Calculate based on reservations
                       backgroundColor: Colors.grey[200],
                       valueColor: AlwaysStoppedAnimation<Color>(
                         Theme.of(context).colorScheme.primary,
@@ -236,12 +252,16 @@ class EventCard extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     TextButton.icon(
-                      onPressed: () {},
+                      onPressed: () {
+                        // TODO: Implement like logic
+                      },
                       icon: const Icon(Icons.favorite_border),
                       label: const Text('J\'aime'),
                     ),
                     ElevatedButton(
-                      onPressed: () {},
+                      onPressed: () {
+                        // TODO: Implement registration logic
+                      },
                       child: const Text('S\'inscrire'),
                     ),
                   ],
@@ -258,7 +278,7 @@ class EventCard extends StatelessWidget {
                 _SocialButton(
                   icon: Icons.favorite_border,
                   label: 'Like',
-                  count: event.likes.length,
+                  count: 0, // TODO: Fetch likes count from database
                   onPressed: () {
                     // Implement like logic
                   },
@@ -266,7 +286,7 @@ class EventCard extends StatelessWidget {
                 _SocialButton(
                   icon: Icons.comment_outlined,
                   label: 'Comment',
-                  count: event.comments.length,
+                  count: 0, // TODO: Fetch comments count from database
                   onPressed: () => _showComments(context),
                 ),
                 _SocialButton(
@@ -289,7 +309,6 @@ class EventCard extends StatelessWidget {
   }
 }
 
-// Helper widget for social buttons
 class _SocialButton extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -316,19 +335,19 @@ class _SocialButton extends StatelessWidget {
   }
 }
 
-// Comments section widget
 class CommentsSection extends StatelessWidget {
-  final Event event;
+  final String eventId; // Use eventId to fetch comments
   final ScrollController controller;
 
   const CommentsSection({
     super.key,
-    required this.event,
+    required this.eventId,
     required this.controller,
   });
 
   @override
   Widget build(BuildContext context) {
+    // TODO: Fetch comments for eventId from database
     return Column(
       children: [
         Container(
@@ -352,10 +371,10 @@ class CommentsSection extends StatelessWidget {
           child: ListView.builder(
             controller: controller,
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            itemCount: event.comments.length,
+            itemCount: 0, // Placeholder: Replace with actual comments length
             itemBuilder: (context, index) {
-              final comment = event.comments[index];
-              return CommentTile(comment: comment);
+              // TODO: Build CommentTile with fetched comments
+              return const SizedBox.shrink(); // Placeholder
             },
           ),
         ),
@@ -397,7 +416,7 @@ class CommentsSection extends StatelessWidget {
   }
 }
 
-// Comment tile widget
+
 class CommentTile extends StatelessWidget {
   final Comment comment;
 
@@ -443,16 +462,3 @@ class CommentTile extends StatelessWidget {
     );
   }
 }
-
-  Widget _buildCategoryChip(String label, bool isSelected) {
-    return Padding(
-      padding: const EdgeInsets.only(right: 8.0),
-      child: Chip(
-        label: Text(label),
-        backgroundColor: isSelected ? Color(0xFF37A2BC) : Colors.grey[200],
-        labelStyle: TextStyle(
-          color: isSelected ? Colors.white : Colors.black,
-        ),
-      ),
-    );
-  }

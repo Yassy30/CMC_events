@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import '../models/event.dart';
 
 class EventDetailsScreen extends StatelessWidget {
@@ -19,6 +20,7 @@ class EventDetailsScreen extends StatelessWidget {
               background: Image.network(
                 event.imageUrl,
                 fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) => const Center(child: Text('Image not available')),
               ),
             ),
           ),
@@ -37,7 +39,7 @@ class EventDetailsScreen extends StatelessWidget {
                         labelStyle: const TextStyle(color: Colors.white),
                       ),
                       Text(
-                        event.isFree ? 'Gratuit' : 'Payant',
+                        event.paymentType == 'free' ? 'Gratuit' : 'Payant',
                         style: Theme.of(context).textTheme.titleMedium,
                       ),
                     ],
@@ -48,13 +50,24 @@ class EventDetailsScreen extends StatelessWidget {
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
                   const SizedBox(height: 8),
-                  Text(event.description),
+                  Text(event.description ?? 'No description available'),
                   const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      const Icon(Icons.calendar_today),
+                      const SizedBox(width: 8),
+                      Text(
+                        DateFormat('yyyy-MM-dd HH:mm').format(event.startDate),
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
                   Row(
                     children: [
                       const Icon(Icons.location_on),
                       const SizedBox(width: 8),
-                      Text(event.location),
+                      Text(event.location ?? 'Location not specified'),
                     ],
                   ),
                   const SizedBox(height: 8),
@@ -62,7 +75,10 @@ class EventDetailsScreen extends StatelessWidget {
                     children: [
                       const Icon(Icons.people),
                       const SizedBox(width: 8),
-                      Text('${event.currentAttendees}/${event.maxAttendees} participants'),
+                      Text(
+                        '0/${event.maxAttendees ?? 'Unlimited'} participants', // Placeholder for current attendees
+                        // TODO: Fetch current attendees from reservations table
+                      ),
                     ],
                   ),
                 ],
@@ -74,11 +90,11 @@ class EventDetailsScreen extends StatelessWidget {
       bottomNavigationBar: Padding(
         padding: const EdgeInsets.all(16.0),
         child: ElevatedButton(
-          onPressed: event.currentAttendees < event.maxAttendees
-              ? () {
-                  // TODO: Implémenter la réservation
-                }
-              : null,
+          onPressed: event.maxAttendees != null && 0 >= (event.maxAttendees ?? 0)
+              ? null
+              : () {
+                  // TODO: Implement reservation logic
+                },
           child: const Text('Réserver une place'),
         ),
       ),

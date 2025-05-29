@@ -1,55 +1,63 @@
 class Event {
   final String id;
   final String title;
-  final String description;
-  final String imageUrl;
-  final DateTime date;
-  final String location;
-  final int maxAttendees;
-  final int currentAttendees;
-  final String organizerId;
-  final bool isFree;
+  final String? description;
+  final String creatorId;
+  final DateTime startDate;
+  final String? location;
   final String category;
-  final String? organizerName;
-  final String? organizerImageUrl;
-  final bool isFollowing;
-  final List<String> likes;
-  final List<Comment> comments;
+  final String paymentType;
+  final int? maxAttendees;
+  final String imageUrl;
+  final bool isCompleted;
+  final DateTime createdAt;
+  final DateTime updatedAt;
 
   Event({
     required this.id,
     required this.title,
-    required this.description,
-    required this.imageUrl,
-    required this.date,
-    required this.location,
-    required this.maxAttendees,
-    required this.currentAttendees,
-    required this.organizerId,
-    required this.isFree,
+    this.description,
+    required this.creatorId,
+    required this.startDate,
+    this.location,
     required this.category,
-    this.organizerName,
-    this.organizerImageUrl,
-    this.isFollowing = false,
-    this.likes = const [],
-    this.comments = const [],
-  });
-}
-
-class Comment {
-  final String id;
-  final String userId;
-  final String username;
-  final String? userImageUrl;
-  final String text;
-  final DateTime createdAt;
-
-  Comment({
-    required this.id,
-    required this.userId,
-    required this.username,
-    this.userImageUrl,
-    required this.text,
+    required this.paymentType,
+    this.maxAttendees,
+    required this.imageUrl,
+    required this.isCompleted,
     required this.createdAt,
+    required this.updatedAt,
   });
+
+  factory Event.fromJson(Map<String, dynamic> json) => Event(
+    id: json['id'],
+    title: json['title'],
+    description: json['description'],
+    creatorId: json['creator_id'],
+    startDate: DateTime.parse(json['start_date']),
+    location: json['location'],
+    category: json['category'],
+    paymentType: json['payment_type'],
+    maxAttendees: json['max_attendees'],
+    imageUrl: json['image_url'],
+    isCompleted: json['is_completed'],
+    createdAt: DateTime.parse(json['created_at']),
+    updatedAt: DateTime.parse(json['updated_at']),
+  );
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'title': title,
+    'description': description,
+    'creator_id': creatorId,
+    'start_date': startDate.toIso8601String(),
+    'location': location,
+    'category': category,
+    'payment_type': paymentType,
+    'max_attendees': maxAttendees,
+    'image_url': imageUrl,
+    'is_completed': isCompleted,
+    'created_at': createdAt.toIso8601String(),
+    'updated_at': updatedAt.toIso8601String(),
+  };
 }
