@@ -5,9 +5,16 @@ import 'package:flutter/material.dart';
 import 'package:cmc_ev/screens/splash_screen.dart';
 import 'package:cmc_ev/screens/home_screen.dart';
 import 'package:cmc_ev/theme/app_theme.dart';
+import 'package:cmc_ev/db/SupabaseConfig.dart';
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await SupabaseConfig.initialize();
+  // Initialize the Supabase client
 
-void main() {
   runApp(const MyApp());
+  print("Supabase initialized successfully");
+  // You can now use SupabaseConfig.client to access the Supabase client
+  
 }
 
 class MyApp extends StatelessWidget {
