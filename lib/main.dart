@@ -1,9 +1,9 @@
 import 'package:cmc_ev/navigation/bottom_navigation.dart';
 import 'package:cmc_ev/screens/admin/admin_dashboard.dart';
-import 'package:cmc_ev/screens/auth_screen.dart';
+import 'package:cmc_ev/screens/stagiaire/auth_screen.dart';
 import 'package:flutter/material.dart';
-import 'package:cmc_ev/screens/splash_screen.dart';
-import 'package:cmc_ev/screens/home_screen.dart';
+import 'package:cmc_ev/screens/stagiaire/splash_screen.dart';
+import 'package:cmc_ev/screens/stagiaire/home_screen.dart';
 import 'package:cmc_ev/theme/app_theme.dart';
 import 'package:cmc_ev/db/SupabaseConfig.dart';
 void main() async {
