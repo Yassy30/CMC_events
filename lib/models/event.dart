@@ -14,7 +14,7 @@ class Event {
   final DateTime updatedAt;
 
   Event({
-    required this.id,
+    this.id = '',
     required this.title,
     this.description,
     required this.creatorId,
@@ -33,6 +33,7 @@ class Event {
     id: json['id'],
     title: json['title'],
     description: json['description'],
+    // creatorId: json['creator_id'],
     creatorId: json['creator_id'],
     startDate: DateTime.parse(json['start_date']),
     location: json['location'],
@@ -46,7 +47,7 @@ class Event {
   );
 
   Map<String, dynamic> toJson() => {
-    'id': id,
+    // 'id': id,
     'title': title,
     'description': description,
     'creator_id': creatorId,

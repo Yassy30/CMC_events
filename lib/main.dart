@@ -6,6 +6,7 @@ import 'package:cmc_ev/screens/stagiaire/splash_screen.dart';
 import 'package:cmc_ev/screens/stagiaire/home_screen.dart';
 import 'package:cmc_ev/theme/app_theme.dart';
 import 'package:cmc_ev/db/SupabaseConfig.dart';
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await SupabaseConfig.initialize();

@@ -58,7 +58,6 @@ class HomeScreen extends StatelessWidget {
                 itemBuilder: (context, index) {
                   return EventCard(
                     event: Event(
-                      id: '1',
                       title: 'Workshop Flutter',
                       description: 'Apprenez à créer des applications mobiles avec Flutter',
                       imageUrl: 'https://example.com/image.jpg',

@@ -1,8 +1,9 @@
+
 import 'package:cmc_ev/screens/stagiaire/create_event_screen.dart';
 import 'package:cmc_ev/screens/stagiaire/discover_screen.dart';
+import 'package:cmc_ev/screens/stagiaire/home_screen.dart';
+import 'package:cmc_ev/screens/stagiaire/profile_screen.dart';
 import 'package:flutter/material.dart';
-import '../screens/stagiaire/home_screen.dart';
-import '../screens/stagiaire/profile_screen.dart';
 
 class MainNavigation extends StatefulWidget {
   const MainNavigation({super.key});
