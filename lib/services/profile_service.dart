@@ -21,21 +21,35 @@ class ProfileService {
   }
 
   // Update profile
-  Future<bool> updateProfile(String userId, String username, String? bio,
-      {File? image}) async {
-    try {
-      final updates = {'username': username, 'bio': bio};
-      if (image != null) {
-        final imageUrl = await _uploadProfileImage(userId, image);
-        updates['profile_picture'] = imageUrl;
-      }
-      await _supabase.from('users').update(updates).eq('id', userId);
-      return true;
-    } catch (e) {
-      print('Error updating profile: $e');
-      return false;
+Future<bool> updateProfile(
+  String userId,
+  String username,
+  String bio, {
+  File? image,
+}) async {
+  try {
+    final updates = {
+      'username': username,
+      'bio': bio,
+      'updated_at': DateTime.now().toIso8601String(),
+    };
+
+    if (image != null) {
+      final imagePath = 'profile_pictures/$userId/${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final uploadResponse = await _supabase.storage
+          .from('avatars')
+          .upload(imagePath, image);
+      final imageUrl = _supabase.storage.from('avatars').getPublicUrl(imagePath);
+      updates['profile_picture'] = imageUrl;
     }
+
+    await _supabase.from('users').update(updates).eq('id', userId);
+    return true;
+  } catch (e) {
+    print('Error updating profile: $e');
+    return false;
   }
+}
 
   // Upload profile image
   Future<String> _uploadProfileImage(String userId, File image) async {
@@ -119,6 +133,16 @@ class ProfileService {
   } catch (e) {
     print('Error fetching saved events: $e');
     return [];
+  }
+}
+Future<bool> deleteAccount(String userId) async {
+  try {
+    await _supabase.from('users').delete().eq('id', userId);
+    await _supabase.auth.admin.deleteUser(userId);
+    return true;
+  } catch (e) {
+    print('Error deleting account: $e');
+    return false;
   }
 }
 }
