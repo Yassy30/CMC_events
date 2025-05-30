@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:cmc_ev/services/auth_service.dart';
-
+import 'package:cmc_ev/screens/stagiaire/provider/user_provider.dart';
+import 'package:provider/provider.dart';
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key});
 
@@ -19,11 +20,37 @@ class _AuthScreenState extends State<AuthScreen> {
   final _usernameController = TextEditingController();
   final AuthService _authService = AuthService();
 
+  @override
+  void initState() {
+    super.initState();
+    // Listen for auth state changes to handle email confirmation
+    _authService.authStateChanges.listen((AuthState state) {
+      if (state.session != null && state.event == AuthChangeEvent.signedIn) {
+        print('User signed in after confirmation: ${state.session!.user.id}');
+        _handleSuccessfulAuth(state.session!.user);
+      }
+    });
+  }
+
+  Future<void> _handleSuccessfulAuth(User user) async {
+    final profile = await _authService.getUserFromTable(user.id);
+    if (profile != null && mounted) {
+      Provider.of<UserProvider>(context, listen: false).setUser(profile);
+      final route = profile.role == 'admin' ? '/admin' : '/home';
+      print('Navigating to $route for user: ${profile.id}, role: ${profile.role}');
+      Navigator.pushReplacementNamed(context, route);
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to fetch user profile')),
+        );
+      }
+    }
+  }
+
   Future<void> _submit() async {
     if (_formKey.currentState!.validate()) {
-      setState(() {
-        _isLoading = true;
-      });
+      setState(() { _isLoading = true; });
       try {
         AuthResponse? response;
         if (_isLogin) {
@@ -38,22 +65,38 @@ class _AuthScreenState extends State<AuthScreen> {
             _usernameController.text,
           );
         }
-        if (response?.user != null && mounted) {
-          Navigator.pushReplacementNamed(context, '/home');
+        if (response?.user != null && response?.session != null && mounted) {
+          await _handleSuccessfulAuth(response!.user!);
+        } else if (response?.user != null && response?.session == null) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Please check your email to confirm your account.')),
+            );
+          }
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Authentication failed')),
-          );
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Authentication failed')),
+            );
+          }
         }
       } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
+        if (e.toString().contains('over_email_send_rate_limit')) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Email send rate limit exceeded. Please wait 42 seconds and try again.')),
+            );
+          }
+        } else {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Error: $e')),
+            );
+          }
+        }
       } finally {
         if (mounted) {
-          setState(() {
-            _isLoading = false;
-          });
+          setState(() { _isLoading = false; });
         }
       }
     }

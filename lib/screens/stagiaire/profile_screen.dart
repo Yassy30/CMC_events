@@ -9,7 +9,7 @@ import 'package:cmc_ev/models/user.dart' as my_models;
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
-
+ 
   @override
   _ProfileScreenState createState() => _ProfileScreenState();
 }
@@ -33,37 +33,65 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _loadUserProfile();
     _loadEvents();
   }
-
-  Future<void> _loadUserProfile() async {
-    final userId = _authService.getCurrentUser()?.id;
-    if (userId != null) {
-      final profile = await _profileService.getUserProfile(userId);
-      final counts = await _profileService.getFollowCounts(userId);
-      if (profile != null && mounted) {
-        setState(() {
-          user = profile;
-          _usernameController.text = profile.username;
-          _bioController.text = profile.bio ?? '';
-          followCounts = counts;
-        });
-      }
+Future<void> _loadUserProfile() async {
+  final userId = _authService.getCurrentUser()?.id;
+  if (userId == null) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Utilisateur non connecté')),
+      );
+      Navigator.pushReplacementNamed(context, '/auth');
     }
+    return;
   }
-
-  Future<void> _loadEvents() async {
-    final userId = _authService.getCurrentUser()?.id;
-    if (userId != null) {
-      final created = await _profileService.getCreatedEvents(userId);
-      final saved = await _profileService.getSavedEvents(userId);
+  try {
+    print('Loading profile for userId: $userId');
+    final profile = await _profileService.getUserProfile(userId);
+    final counts = await _profileService.getFollowCounts(userId);
+    if (profile != null && mounted) {
+      setState(() {
+        user = profile;
+        _usernameController.text = profile.username;
+        _bioController.text = profile.bio ?? '';
+        followCounts = counts;
+      });
+    } else {
       if (mounted) {
-        setState(() {
-          createdEvents = created;
-          savedEvents = saved;
-        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Profil non trouvé')),
+        );
+        Navigator.pushReplacementNamed(context, '/auth');
       }
     }
+  } catch (e) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erreur de chargement du profil: $e')),
+      );
+    }
   }
+}
 
+Future<void> _loadEvents() async {
+  final userId = _authService.getCurrentUser()?.id;
+  if (userId == null) return;
+  try {
+    final created = await _profileService.getCreatedEvents(userId);
+    final saved = await _profileService.getSavedEvents(userId);
+    if (mounted) {
+      setState(() {
+        createdEvents = created;
+        savedEvents = saved;
+      });
+    }
+  } catch (e) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erreur de chargement des événements: $e')),
+      );
+    }
+  }
+}
   Future<void> _pickImage() async {
     final pickedFile = await _picker.pickImage(source: ImageSource.gallery);
     if (pickedFile != null && mounted) {

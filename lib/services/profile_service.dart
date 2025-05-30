@@ -4,7 +4,7 @@ import 'package:cmc_ev/models/user.dart' as local_user;
 
 class ProfileService {
   final SupabaseClient _supabase = Supabase.instance.client;
-
+ 
   // Fetch user profile
   Future<local_user.User?> getUserProfile(String userId) async {
     try {
@@ -39,10 +39,10 @@ class ProfileService {
 
   // Upload profile image
   Future<String> _uploadProfileImage(String userId, File image) async {
-    final path = 'profile_images/$userId.jpg';
-    await _supabase.storage.from('profile-pictures').upload(path, image);
-    return _supabase.storage.from('profile-pictures').getPublicUrl(path);
-  }
+  final path = 'profile-pictures/$userId.jpg';
+  await _supabase.storage.from('profile-pictures').upload(path, image);
+  return _supabase.storage.from('profile-pictures').getPublicUrl(path);
+}
 
   // Follow/Unfollow user
   Future<void> followUser(String followerId, String followedId, bool follow) async {
@@ -105,19 +105,20 @@ class ProfileService {
 
   // Fetch saved events
   Future<List<Map<String, dynamic>>> getSavedEvents(String userId) async {
-    try {
-      final response = await _supabase
-          .from('saved_events')
-          .select('events(*)')
-          .eq('user_id', userId)
-          .order('created_at', ascending: false);
-      // Extract the 'events' map from each saved_event row
-      return List<Map<String, dynamic>>.from(
-        (response as List).map((row) => row['events'] as Map<String, dynamic>)
-      );
-    } catch (e) {
-      print('Error fetching saved events: $e');
-      return [];
-    }
+  try {
+    final response = await _supabase
+        .from('saved_events')
+        .select('events(*)')
+        .eq('user_id', userId)
+        .order('created_at', ascending: false);
+    // Ensure the response is a List of Maps with String keys
+    return (response as List).map((row) {
+      final event = row['events'] as Map? ?? {};
+      return event.cast<String, dynamic>();
+    }).toList();
+  } catch (e) {
+    print('Error fetching saved events: $e');
+    return [];
   }
+}
 }

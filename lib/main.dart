@@ -10,6 +10,8 @@ import 'package:cmc_ev/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:cmc_ev/screens/stagiaire/provider/user_provider.dart';
+import 'package:flutter/widgets.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -45,26 +47,36 @@ class MyApp extends StatelessWidget {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const SplashScreen();
           }
-          final session = snapshot.data?.session;
-          if (session == null) {
-            return const AuthScreen();
-          }
-          // Fetch user role to determine routing
-          return FutureBuilder<local_user.User?>(
-            future: _fetchUser(session.user.id),
-            builder: (context, userSnapshot) {
-              if (userSnapshot.connectionState == ConnectionState.waiting) {
+          return FutureBuilder<void>(
+            future: Future.delayed(const Duration(seconds: 2)),
+            builder: (context, delaySnapshot) {
+              if (delaySnapshot.connectionState == ConnectionState.waiting) {
                 return const SplashScreen();
               }
-              final user = userSnapshot.data;
-              if (user != null) {
-                Provider.of<UserProvider>(context, listen: false).setUser(user);
-                if (user.role == 'admin') {
-                  return const AdminDashboard();
-                }
-                return const MainNavigation();
+              final session = snapshot.data?.session;
+              if (session == null) {
+                return const AuthScreen();
               }
-              return const AuthScreen();
+              return FutureBuilder<local_user.User?>(
+                future: _fetchUser(session.user.id),
+                builder: (context, userSnapshot) {
+                  if (userSnapshot.connectionState == ConnectionState.waiting) {
+                    return const SplashScreen();
+                  }
+                  if (userSnapshot.hasError || userSnapshot.data == null) {
+                    print('User fetch error or null: ${userSnapshot.error}');
+                    Supabase.instance.client.auth.signOut();
+                    return const AuthScreen();
+                  }
+                  final user = userSnapshot.data!;
+                  // Set user outside build phase
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    Provider.of<UserProvider>(context, listen: false).setUser(user);
+                  });
+                  print('Initial navigation to ${user.role == 'admin' ? '/admin' : '/home'} for user: ${user.id}');
+                  return user.role == 'admin' ? const AdminDashboard() : const MainNavigation();
+                },
+              );
             },
           );
         },
@@ -84,20 +96,5 @@ class MyApp extends StatelessWidget {
       print('Error fetching user: $e');
       return null;
     }
-  }
-}
-
-class UserProvider with ChangeNotifier {
-  local_user.User? _user;
-  local_user.User? get user => _user;
-
-  void setUser(local_user.User user) {
-    _user = user;
-    notifyListeners();
-  }
-
-  void clearUser() {
-    _user = null;
-    notifyListeners();
   }
 }
