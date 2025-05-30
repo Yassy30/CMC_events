@@ -1,9 +1,11 @@
-import 'package:cmc_ev/navigation/bottom_navigation.dart';
-import 'package:cmc_ev/screens/stagiaire/home_screen.dart';
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../navigation/bottom_navigation.dart';
 import '../../services/event_service.dart';
 import '../../db/SupabaseConfig.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart'; // Add this import
 
 class CreateEventScreen extends StatefulWidget {
   const CreateEventScreen({super.key});
@@ -27,11 +29,9 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   String? _selectedCategory;
   final _eventService = EventService();
 
-
-  
-
   final List<String> _categories = ['sport', 'culture', 'competition', 'other'];
 
+final String huggingFaceApiToken = dotenv.env['HF_API_TOKEN'] ?? 'default_token';
   @override
   void initState() {
     super.initState();
@@ -47,6 +47,78 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     _maxAttendeesController.dispose();
     _priceController.dispose();
     super.dispose();
+  }
+
+  Future<Map<String, String>> _generateText(String prompt) async {
+    final url = Uri.parse('https://api-inference.huggingface.co/models/distilgpt2');
+    try {
+      final response = await http.post(
+        url,
+        headers: {
+          'Authorization': 'Bearer $huggingFaceApiToken',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'inputs': 'Generate a title and description for an event based on this prompt: $prompt',
+          'parameters': {'max_length': 100},
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        String generatedText = data[0]['generated_text'];
+        // Basic parsing; adjust based on model output
+        List<String> parts = generatedText.split('\n');
+        String title = parts.length > 0 ? parts[0].trim() : 'Generated Event';
+        String description = parts.length > 1 ? parts[1].trim() : 'No description generated';
+        return {'title': title, 'description': description};
+      } else {
+        print('Text generation failed: ${response.statusCode}');
+        return {'title': '', 'description': ''};
+      }
+    } catch (e) {
+      print('Error generating text: $e');
+      return {'title': '', 'description': ''};
+    }
+  }
+
+  Future<String?> _generateImage(String prompt) async {
+    final url = Uri.parse('https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-2-1');
+    try {
+      final response = await http.post(
+        url,
+        headers: {
+          'Authorization': 'Bearer $huggingFaceApiToken',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'inputs': prompt,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final fileName = 'event_${DateTime.now().millisecondsSinceEpoch}.png';
+        final storageResponse = await SupabaseConfig.client.storage
+            .from('event_images')
+            .uploadBinary(fileName, response.bodyBytes);
+
+        if (storageResponse.isNotEmpty) {
+          final imageUrl = SupabaseConfig.client.storage
+              .from('event_images')
+              .getPublicUrl(fileName);
+          return imageUrl;
+        } else {
+          print('Failed to upload image to Supabase');
+          return null;
+        }
+      } else {
+        print('Image generation failed: ${response.statusCode}');
+        return null;
+      }
+    } catch (e) {
+      print('Error generating image: $e');
+      return null;
+    }
   }
 
   void _showAIGeneratorDialog() {
@@ -68,9 +140,48 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
             SizedBox(
               width: double.infinity,
               child: FilledButton(
-                onPressed: () {
-                  // TODO: Générer le titre, la description et l'image
+                onPressed: () async {
+                  if (_promptController.text.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Veuillez entrer une description')),
+                    );
+                    return;
+                  }
+
+                  // Show loading indicator
+                  showDialog(
+                    context: context,
+                    barrierDismissible: false,
+                    builder: (context) => const Center(child: CircularProgressIndicator()),
+                  );
+
+                  // Generate text and image
+                  final textResult = await _generateText(_promptController.text);
+                  final imageUrl = await _generateImage(_promptController.text);
+
+                  // Close loading dialog
                   Navigator.pop(context);
+
+                  // Update form fields
+                  setState(() {
+                    _titleController.text = textResult['title']!;
+                    _descriptionController.text = textResult['description']!;
+                    _imageUrl = imageUrl;
+                  });
+
+                  // Close the dialog
+                  Navigator.pop(context);
+
+                  // Show success or error message
+                  if (textResult['title']!.isNotEmpty && imageUrl != null) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Contenu généré avec succès !')),
+                    );
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Erreur lors de la génération du contenu')),
+                    );
+                  }
                 },
                 child: const Text('Générer'),
               ),
@@ -87,7 +198,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
           .from('users')
           .select('id')
           .limit(1)
-          .maybeSingle(); // Use maybeSingle to handle empty results
+          .maybeSingle();
 
       if (response != null && response['id'] != null) {
         print("the user id : ${response['id'] as String}");
@@ -132,7 +243,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         _selectedTime!.minute,
       );
 
-      print('Creating event with creatorId: $creatorId'); // Debug log
+      print('Creating event with creatorId: $creatorId');
       await _eventService.createEvent(
         title: _titleController.text,
         description: _descriptionController.text,
@@ -149,11 +260,10 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Event created successfully!')),
         );
-       Navigator.pushReplacement(
-  context,
-  MaterialPageRoute(builder: (_) => const MainNavigation()),
-);
-
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const MainNavigation()),
+        );
       }
     } catch (e) {
       if (mounted) {
@@ -379,20 +489,31 @@ class _ImagePicker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final state = context.findAncestorStateOfType<_CreateEventScreenState>();
+    final imageUrl = state?._imageUrl;
+
     return Container(
       height: 200,
       decoration: BoxDecoration(
         border: Border.all(color: Colors.grey),
         borderRadius: BorderRadius.circular(4),
       ),
-      child: Center(
-        child: IconButton(
-          icon: const Icon(Icons.add_photo_alternate, size: 50),
-          onPressed: () {
-            // TODO: Implement image picking and uploading
-          },
-        ),
-      ),
+      child: imageUrl != null
+          ? Image.network(
+              imageUrl,
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) => const Center(
+                child: Icon(Icons.error, size: 50),
+              ),
+            )
+          : Center(
+              child: IconButton(
+                icon: const Icon(Icons.add_photo_alternate, size: 50),
+                onPressed: () {
+                  // Optionally implement manual image picking here
+                },
+              ),
+            ),
     );
   }
 }
