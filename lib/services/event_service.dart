@@ -10,7 +10,6 @@ class EventService {
   Future<String> createEvent({
     required String title,
     required String description,
-    required String creatorId,
     required DateTime startDate,
     required String location,
     required String category,
@@ -18,15 +17,12 @@ class EventService {
     int? maxAttendees,
     required String imageUrl,
   }) async {
-    // Validate creatorId
-    if (creatorId.isEmpty) {
-      throw Exception('creatorId cannot be empty in EventService');
-    }
+    const creatorId = "26bd4d62-1804-4962-a6b8-d42fffda6475";
 
     final event = Event(
       title: title,
       description: description,
-      creatorId: "26bd4d62-1804-4962-a6b8-d42fffda6475",
+      creatorId: creatorId,
       startDate: startDate,
       location: location,
       category: category,
@@ -38,7 +34,6 @@ class EventService {
       updatedAt: DateTime.now(),
     );
 
-    // Log the JSON representation of the event
     final eventJson = event.toJson();
     print('Event JSON before repository call: $eventJson');
 

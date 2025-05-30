@@ -1,11 +1,12 @@
 import 'dart:convert';
+import 'package:cmc_ev/services/event_service.dart';
+import 'package:cmc_ev/services/image_service.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../navigation/bottom_navigation.dart';
-import '../../services/event_service.dart';
 import '../../db/SupabaseConfig.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart'; // Add this import
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class CreateEventScreen extends StatefulWidget {
   const CreateEventScreen({super.key});
@@ -28,10 +29,11 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   String? _imageUrl;
   String? _selectedCategory;
   final _eventService = EventService();
+  final _imageService = ImageService(); // Initialize ImageService
 
   final List<String> _categories = ['sport', 'culture', 'competition', 'other'];
+  final String huggingFaceApiToken = dotenv.env['HF_API_TOKEN'] ?? 'default_token';
 
-final String huggingFaceApiToken = dotenv.env['HF_API_TOKEN'] ?? 'default_token';
   @override
   void initState() {
     super.initState();
@@ -67,7 +69,6 @@ final String huggingFaceApiToken = dotenv.env['HF_API_TOKEN'] ?? 'default_token'
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         String generatedText = data[0]['generated_text'];
-        // Basic parsing; adjust based on model output
         List<String> parts = generatedText.split('\n');
         String title = parts.length > 0 ? parts[0].trim() : 'Generated Event';
         String description = parts.length > 1 ? parts[1].trim() : 'No description generated';
@@ -79,45 +80,6 @@ final String huggingFaceApiToken = dotenv.env['HF_API_TOKEN'] ?? 'default_token'
     } catch (e) {
       print('Error generating text: $e');
       return {'title': '', 'description': ''};
-    }
-  }
-
-  Future<String?> _generateImage(String prompt) async {
-    final url = Uri.parse('https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-2-1');
-    try {
-      final response = await http.post(
-        url,
-        headers: {
-          'Authorization': 'Bearer $huggingFaceApiToken',
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode({
-          'inputs': prompt,
-        }),
-      );
-
-      if (response.statusCode == 200) {
-        final fileName = 'event_${DateTime.now().millisecondsSinceEpoch}.png';
-        final storageResponse = await SupabaseConfig.client.storage
-            .from('event_images')
-            .uploadBinary(fileName, response.bodyBytes);
-
-        if (storageResponse.isNotEmpty) {
-          final imageUrl = SupabaseConfig.client.storage
-              .from('event_images')
-              .getPublicUrl(fileName);
-          return imageUrl;
-        } else {
-          print('Failed to upload image to Supabase');
-          return null;
-        }
-      } else {
-        print('Image generation failed: ${response.statusCode}');
-        return null;
-      }
-    } catch (e) {
-      print('Error generating image: $e');
-      return null;
     }
   }
 
@@ -148,31 +110,25 @@ final String huggingFaceApiToken = dotenv.env['HF_API_TOKEN'] ?? 'default_token'
                     return;
                   }
 
-                  // Show loading indicator
                   showDialog(
                     context: context,
                     barrierDismissible: false,
                     builder: (context) => const Center(child: CircularProgressIndicator()),
                   );
 
-                  // Generate text and image
                   final textResult = await _generateText(_promptController.text);
-                  final imageUrl = await _generateImage(_promptController.text);
+                  final imageUrl = await _imageService.generateAndUploadImage(_promptController.text, huggingFaceApiToken);
 
-                  // Close loading dialog
                   Navigator.pop(context);
 
-                  // Update form fields
                   setState(() {
                     _titleController.text = textResult['title']!;
                     _descriptionController.text = textResult['description']!;
                     _imageUrl = imageUrl;
                   });
 
-                  // Close the dialog
                   Navigator.pop(context);
 
-                  // Show success or error message
                   if (textResult['title']!.isNotEmpty && imageUrl != null) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(content: Text('Contenu généré avec succès !')),
@@ -192,25 +148,6 @@ final String huggingFaceApiToken = dotenv.env['HF_API_TOKEN'] ?? 'default_token'
     );
   }
 
-  Future<String?> _fetchFirstUserId() async {
-    try {
-      final response = await SupabaseConfig.client
-          .from('users')
-          .select('id')
-          .limit(1)
-          .maybeSingle();
-
-      if (response != null && response['id'] != null) {
-        print("the user id : ${response['id'] as String}");
-        return response['id'] as String;
-      }
-      print('No users found in the database.');
-    } catch (e) {
-      print('Error fetching first user: $e');
-    }
-    return null;
-  }
-
   Future<void> _createEvent() async {
     if (!_formKey.currentState!.validate()) return;
     if (_selectedDate == null || _selectedTime == null) {
@@ -226,14 +163,6 @@ final String huggingFaceApiToken = dotenv.env['HF_API_TOKEN'] ?? 'default_token'
       return;
     }
 
-    final creatorId = await _fetchFirstUserId();
-    if (creatorId == null || creatorId.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No users found. Please create a user first.')),
-      );
-      return;
-    }
-
     try {
       final startDate = DateTime(
         _selectedDate!.year,
@@ -243,17 +172,16 @@ final String huggingFaceApiToken = dotenv.env['HF_API_TOKEN'] ?? 'default_token'
         _selectedTime!.minute,
       );
 
-      print('Creating event with creatorId: $creatorId');
+      print('Creating event with imageUrl: $_imageUrl');
       await _eventService.createEvent(
         title: _titleController.text,
         description: _descriptionController.text,
-        creatorId: creatorId,
         startDate: startDate,
         location: _locationController.text,
         category: _selectedCategory!,
         paymentType: _isFree ? 'free' : 'paid',
         maxAttendees: int.tryParse(_maxAttendeesController.text),
-        imageUrl: _imageUrl ?? 'https://placeholder.com/event-image.jpg',
+        imageUrl: _imageUrl ?? 'https://via.placeholder.com/150',
       );
 
       if (mounted) {
@@ -292,6 +220,20 @@ final String huggingFaceApiToken = dotenv.env['HF_API_TOKEN'] ?? 'default_token'
           children: [
             _ImagePicker(
               onImageSelected: (url) => setState(() => _imageUrl = url),
+              onPickImage: () async {
+                try {
+                  final imageUrl = await _imageService.uploadImageFromGallery();
+                  if (imageUrl != null) {
+                    setState(() {
+                      _imageUrl = imageUrl;
+                    });
+                  }
+                } catch (e) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Failed to upload image')),
+                  );
+                }
+              },
             ),
             const SizedBox(height: 16),
             TextFormField(
@@ -484,8 +426,9 @@ final String huggingFaceApiToken = dotenv.env['HF_API_TOKEN'] ?? 'default_token'
 
 class _ImagePicker extends StatelessWidget {
   final Function(String)? onImageSelected;
+  final VoidCallback? onPickImage;
 
-  const _ImagePicker({this.onImageSelected});
+  const _ImagePicker({this.onImageSelected, this.onPickImage});
 
   @override
   Widget build(BuildContext context) {
@@ -502,16 +445,15 @@ class _ImagePicker extends StatelessWidget {
           ? Image.network(
               imageUrl,
               fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) => const Center(
-                child: Icon(Icons.error, size: 50),
-              ),
+              errorBuilder: (context, error, stackTrace) {
+                print('Image load error: $error');
+                return const Center(child: Icon(Icons.error, size: 50));
+              },
             )
           : Center(
               child: IconButton(
                 icon: const Icon(Icons.add_photo_alternate, size: 50),
-                onPressed: () {
-                  // Optionally implement manual image picking here
-                },
+                onPressed: onPickImage,
               ),
             ),
     );
