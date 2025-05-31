@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -33,6 +32,8 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   final _eventService = EventService();
 
   final List<String> _categories = ['sport', 'culture', 'competition', 'other'];
+  final String huggingFaceApiToken =
+      dotenv.env['HF_API_TOKEN'] ?? 'default_token';
 
   @override
   void initState() {
@@ -51,50 +52,77 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     super.dispose();
   }
 
-Future<Map<String, String>> _generateText(String prompt) async {
-  try {
-    // List of dynamic elements for variety
-    final List<String> adjectives = ['Exciting', 'Fun', 'Amazing', 'Thrilling', 'Unique'];
-    final List<String> eventTypes = ['Festival', 'Gathering', 'Show', 'Competition', 'Experience'];
-    final Random random = Random();
-
-    // Generate title
-    String title = prompt.trim();
-    if (title.isEmpty) {
-      title = '${adjectives[random.nextInt(adjectives.length)]} ${eventTypes[random.nextInt(eventTypes.length)]}';
-    } else {
-      title = title.split(' ').map((word) => word.isNotEmpty ? '${word[0].toUpperCase()}${word.substring(1).toLowerCase()}' : '').join(' ');
-      title = '${adjectives[random.nextInt(adjectives.length)]} $title ${eventTypes[random.nextInt(eventTypes.length)]}';
-    }
-
-    // Generate description with dynamic content
-    String description = 'Join us for an ${adjectives[random.nextInt(adjectives.length)].toLowerCase()} event! ';
-    if (prompt.isNotEmpty) {
-      description += 'This event focuses on $prompt, offering a ${adjectives[random.nextInt(adjectives.length)].toLowerCase()} time for all. ';
-    }
-    description += 'Expect ${['live music', 'fun activities', 'great food', 'exciting games', 'special performances'][random.nextInt(5)]} ';
-    description += 'on ${DateTime.now().toString().split(' ')[0]} at a location near you. Don’t miss out!';
-
-    return {'title': title, 'description': description};
-  } catch (e) {
-    print('Error generating text: $e');
-    return {'title': 'Generated Event', 'description': 'No description generated'};
-  }
-}
-  Future<String?> _pickAndUploadImage(ImageSource source) async {
+  Future<Map<String, String>> _generateText(String prompt) async {
+    final url =
+        Uri.parse('https://api-inference.huggingface.co/models/distilgpt2');
     try {
-      final XFile? image = await ImagePicker().pickImage(source: source);
-      if (image == null) return null;
+      final response = await http.post(
+        url,
+        headers: {
+          'Authorization': 'Bearer $huggingFaceApiToken',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'inputs':
+              'Generate a title and description for an event based on this prompt: $prompt',
+          'parameters': {'max_length': 100},
+        }),
+      );
 
-      final fileName = 'event_${DateTime.now().millisecondsSinceEpoch}.png';
-      final path = 'public/$fileName';
-      final File imageFile = File(image.path);
-
-      await SupabaseConfig.client.storage.from('eventimages').upload(path, imageFile);
-      final imageUrl = SupabaseConfig.client.storage.from('eventimages').getPublicUrl(path);
-      return imageUrl;
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        String generatedText = data[0]['generated_text'];
+        List<String> parts = generatedText.split('\n');
+        String title = parts.length > 0 ? parts[0].trim() : 'Generated Event';
+        String description =
+            parts.length > 1 ? parts[1].trim() : 'No description generated';
+        return {'title': title, 'description': description};
+      } else {
+        print('Text generation failed: ${response.statusCode}');
+        return {'title': '', 'description': ''};
+      }
     } catch (e) {
-      print('Error picking/uploading image: $e');
+      print('Error generating text: $e');
+      return {'title': '', 'description': ''};
+    }
+  }
+
+  Future<String?> _generateImage(String prompt) async {
+    final url = Uri.parse(
+        'https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-2-1');
+    try {
+      final response = await http.post(
+        url,
+        headers: {
+          'Authorization': 'Bearer $huggingFaceApiToken',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'inputs': prompt,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final fileName = 'event_${DateTime.now().millisecondsSinceEpoch}.png';
+        final storageResponse = await SupabaseConfig.client.storage
+            .from('eventimages')
+            .uploadBinary(fileName, response.bodyBytes);
+
+        if (storageResponse.isNotEmpty) {
+          final imageUrl = SupabaseConfig.client.storage
+              .from('eventimages')
+              .getPublicUrl(fileName);
+          return imageUrl;
+        } else {
+          print('Failed to upload image to Supabase');
+          return null;
+        }
+      } else {
+        print('Image generation failed: ${response.statusCode}');
+        return null;
+      }
+    } catch (e) {
+      print('Error generating image: $e');
       return null;
     }
   }
@@ -103,14 +131,14 @@ Future<Map<String, String>> _generateText(String prompt) async {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Générateur IA (100% Free)'),
+        title: const Text('Générateur IA'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             TextField(
               controller: _promptController,
               decoration: const InputDecoration(
-                labelText: 'Enter a prompt for event generation',
+                labelText: 'Description pour la génération',
               ),
               maxLines: 3,
             ),
@@ -121,7 +149,8 @@ Future<Map<String, String>> _generateText(String prompt) async {
                 onPressed: () async {
                   if (_promptController.text.isEmpty) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Please enter a prompt')),
+                      const SnackBar(
+                          content: Text('Veuillez entrer une description')),
                     );
                     return;
                   }
@@ -129,31 +158,38 @@ Future<Map<String, String>> _generateText(String prompt) async {
                   showDialog(
                     context: context,
                     barrierDismissible: false,
-                    builder: (context) => const Center(child: CircularProgressIndicator()),
+                    builder: (context) =>
+                        const Center(child: CircularProgressIndicator()),
                   );
 
-                  final textResult = await _generateText(_promptController.text);
+                  final textResult =
+                      await _generateText(_promptController.text);
+                  final imageUrl = await _generateImage(_promptController.text);
 
                   Navigator.pop(context);
 
                   setState(() {
                     _titleController.text = textResult['title']!;
                     _descriptionController.text = textResult['description']!;
+                    _imageUrl = imageUrl;
                   });
 
                   Navigator.pop(context);
 
-                  if (textResult['title']!.isNotEmpty) {
+                  if (textResult['title']!.isNotEmpty && imageUrl != null) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Text generated successfully!')),
+                      const SnackBar(
+                          content: Text('Contenu généré avec succès !')),
                     );
                   } else {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Error generating text')),
+                      const SnackBar(
+                          content:
+                              Text('Erreur lors de la génération du contenu')),
                     );
                   }
                 },
-                child: const Text('Generate'),
+                child: const Text('Générer'),
               ),
             ),
           ],
@@ -199,7 +235,8 @@ Future<Map<String, String>> _generateText(String prompt) async {
     final creatorId = await _fetchFirstUserId();
     if (creatorId == null || creatorId.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No users found. Please create a user first.')),
+        const SnackBar(
+            content: Text('No users found. Please create a user first.')),
       );
       return;
     }
@@ -216,19 +253,27 @@ Future<Map<String, String>> _generateText(String prompt) async {
       double? ticketPrice;
       String paymentType = 'free';
       if (!_isFree) {
-        print('Price text before parsing: "${_priceController.text}"');
-        final priceText = _priceController.text.trim();
+        print(
+            'Price text before parsing: "${_priceController.text}"'); // Debug print
+        final priceText =
+            _priceController.text.trim(); // Remove leading/trailing spaces
         ticketPrice = double.tryParse(priceText);
         if (ticketPrice == null || ticketPrice <= 0) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Invalid ticket price. Please enter a valid positive number.')),
+            const SnackBar(
+                content: Text(
+                    'Invalid ticket price. Please enter a valid positive number.')),
           );
           return;
         }
         paymentType = 'paid';
       }
 
-      print('Creating event with creatorId: $creatorId, paymentType: $paymentType, ticketPrice: $ticketPrice');
+      print(
+          'Creating event with creatorId: $creatorId, paymentType: $paymentType, ticketPrice: $ticketPrice');
+      if(ticketPrice == null) {
+        print('Ticket price is: $ticketPrice');
+      } else {
       await _eventService.createEvent(
         title: _titleController.text,
         description: _descriptionController.text,
@@ -239,7 +284,7 @@ Future<Map<String, String>> _generateText(String prompt) async {
         paymentType: paymentType,
         ticketPrice: ticketPrice,
         maxAttendees: int.tryParse(_maxAttendeesController.text),
-        imageUrl: _imageUrl ?? 'https://via.placeholder.com/150',
+        imageUrl: _imageUrl ?? 'https://placeholder.com/event-image.jpg',
       );
 
       if (mounted) {
@@ -250,7 +295,7 @@ Future<Map<String, String>> _generateText(String prompt) async {
           context,
           MaterialPageRoute(builder: (_) => const MainNavigation()),
         );
-      }
+      }}
     } catch (e) {
       if (mounted) {
         print('Failed to create event: $e');
@@ -318,7 +363,8 @@ Future<Map<String, String>> _generateText(String prompt) async {
               items: _categories.map((String category) {
                 return DropdownMenuItem<String>(
                   value: category,
-                  child: Text(category[0].toUpperCase() + category.substring(1)),
+                  child:
+                      Text(category[0].toUpperCase() + category.substring(1)),
                 );
               }).toList(),
               onChanged: (String? newValue) {
@@ -442,7 +488,8 @@ Future<Map<String, String>> _generateText(String prompt) async {
                   border: OutlineInputBorder(),
                   prefixIcon: Icon(Icons.euro),
                 ),
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
                 validator: (value) {
                   if (!_isFree) {
                     if (value == null || value.isEmpty) {
@@ -490,17 +537,19 @@ class _ImagePickerState extends State<_ImagePicker> {
       setState(() => _isUploading = true);
 
       final File imageFile = File(image.path);
-      final String fileName = 'event_${DateTime.now().millisecondsSinceEpoch}.png';
+      final String fileName =
+          'event_${DateTime.now().millisecondsSinceEpoch}.png';
 
+      // Upload to a specific folder
       final String path = 'public/$fileName';
 
       final response = await SupabaseConfig.client.storage
           .from('eventimages')
           .upload(path, imageFile);
 
-      final String publicUrl = SupabaseConfig.client.storage
-          .from('eventimages')
-          .getPublicUrl(path);
+      // Get public URL from just the path used (not full response)
+      final String publicUrl =
+          SupabaseConfig.client.storage.from('eventimages').getPublicUrl(path);
 
       setState(() {
         _uploadedImageUrl = publicUrl;
@@ -567,7 +616,8 @@ class _ImagePickerState extends State<_ImagePicker> {
                     _uploadedImageUrl!,
                     fit: BoxFit.cover,
                     errorBuilder: (context, error, stackTrace) => const Center(
-                      child: Icon(Icons.error_outline, size: 50, color: Colors.red),
+                      child: Icon(Icons.error_outline,
+                          size: 50, color: Colors.red),
                     ),
                   )
                 : const Center(
