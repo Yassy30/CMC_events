@@ -1,30 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:cmc_ev/screens/stagiaire/autho/auth_screen.dart';
 import 'package:cmc_ev/theme/app_theme.dart';
 
-class SplashScreen extends StatefulWidget {
+class SplashScreen extends StatelessWidget {
   const SplashScreen({super.key});
-
-  @override
-  State<SplashScreen> createState() => _SplashScreenState();
-}
-
-class _SplashScreenState extends State<SplashScreen> {
-  @override
-  void initState() {
-    super.initState();
-    _navigateAfterDelay();
-  }
-
-  Future<void> _navigateAfterDelay() async {
-    await Future.delayed(const Duration(seconds: 2));
-    if (mounted) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const AuthScreen()),
-      );
-    }
-  }
 
   @override
   Widget build(BuildContext context) {

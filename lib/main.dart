@@ -55,6 +55,8 @@ class AuthWrapper extends StatefulWidget {
 }
 
 class _AuthWrapperState extends State<AuthWrapper> {
+  bool _hasNavigated = false;
+
   @override
   void initState() {
     super.initState();
@@ -62,10 +64,16 @@ class _AuthWrapperState extends State<AuthWrapper> {
   }
 
   Future<void> _checkAuthState() async {
+    // Simulate splash screen delay
+    await Future.delayed(const Duration(seconds: 2));
+
+    if (_hasNavigated || !mounted) return;
+
     final supabase = Supabase.instance.client;
     final session = supabase.auth.currentSession;
 
     if (session == null) {
+      _hasNavigated = true;
       if (mounted) {
         Navigator.pushReplacementNamed(context, '/auth');
       }
@@ -75,6 +83,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
     final user = await _fetchUser(session.user.id);
     if (user == null) {
       await supabase.auth.signOut();
+      _hasNavigated = true;
       if (mounted) {
         Navigator.pushReplacementNamed(context, '/auth');
       }
@@ -85,6 +94,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
       Provider.of<UserProvider>(context, listen: false).setUser(user);
       final route = user.role == 'admin' ? '/admin' : '/home';
       print('Initial navigation to $route for user: ${user.id}');
+      _hasNavigated = true;
       Navigator.pushReplacementNamed(context, route);
     }
   }
