@@ -1,78 +1,118 @@
-import 'comment.dart';
+// import 'dart:ffi';
 
+// class Event {
+//   final String id;
+//   final String title;
+//   final String? description;
+//   final String creatorId;
+//   final DateTime startDate;
+//   final String? location;
+//   final String category;
+//   final String paymentType;
+//   final int? maxAttendees;
+//   final String imageUrl;
+//   final bool isCompleted;
+//   final double? ticketPrice;
+//   final DateTime createdAt;
+//   final DateTime updatedAt;
+
+//   Event({
+//     this.id = '',
+//     required this.title,
+//     this.description,
+//     this.ticketPrice,
+//     required this.creatorId,
+//     required this.startDate,
+//     this.location,
+//     required this.category,
+//     required this.paymentType,
+//     this.maxAttendees,
+//     required this.imageUrl,
+//     required this.isCompleted,
+//     required this.createdAt,
+//     required this.updatedAt,
+//   });
+
+//   factory Event.fromJson(Map<String, dynamic> json) => Event(
+//     id: json['id'],
+//     title: json['title'],
+//     description: json['description'],
+//     // creatorId: json['creator_id'],
+//     creatorId: json['creator_id'],
+//     startDate: DateTime.parse(json['start_date']),
+//     location: json['location'],
+//     category: json['category'],
+//     paymentType: json['payment_type'],
+//     maxAttendees: json['max_attendees'],
+//     imageUrl: json['image_url'],
+//     isCompleted: json['is_completed'],
+//     ticketPrice: (json['ticket_price'] as num?)?.toDouble(),
+//     createdAt: DateTime.parse(json['created_at']),
+//     updatedAt: DateTime.parse(json['updated_at']),
+//   );
+
+//   Map<String, dynamic> toJson() => {
+//     // 'id': id,
+//     'title': title,
+//     'description': description,
+//     'creator_id': creatorId,
+//     'start_date': startDate.toIso8601String(),
+//     'location': location,
+//     'category': category,
+//     'payment_type': paymentType,
+//     'max_attendees': maxAttendees,
+//     'image_url': imageUrl,
+//     'created_at': createdAt.toIso8601String(),
+//     'updated_at': updatedAt.toIso8601String(),
+//     'ticket_price': ticketPrice,
+//   };
+// }
 class Event {
   final String id;
   final String title;
-  final String? description;
+  final String description;
   final String creatorId;
   final DateTime startDate;
-  final String? location;
+  final String location;
   final String category;
   final String paymentType;
   final int? maxAttendees;
-  final int? currentAttendees;
-  final String? imageUrl;
+  final String imageUrl;
   final bool isCompleted;
-  final String? organizerName;
-  final String? organizerImageUrl;
-  final List<Comment>? comments;
-  final List<String>? likes;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  final double? ticketPrice; // Add this field
 
   Event({
-    required this.id,
+    this.id = '',
     required this.title,
-    this.description,
+    required this.description,
     required this.creatorId,
     required this.startDate,
-    this.location,
+    required this.location,
     required this.category,
     required this.paymentType,
     this.maxAttendees,
-    this.currentAttendees,
-    this.imageUrl,
+    required this.imageUrl,
     required this.isCompleted,
-    this.organizerName,
-    this.organizerImageUrl,
-    this.comments,
-    this.likes,
+    required this.createdAt,
+    required this.updatedAt,
+    this.ticketPrice, // Make it nullable
   });
 
-  factory Event.fromMap(Map<String, dynamic> data) {
-    return Event(
-      id: data['id'],
-      title: data['title'],
-      description: data['description'],
-      creatorId: data['creator_id'],
-      startDate: DateTime.parse(data['start_date']),
-      location: data['location'],
-      category: data['category'],
-      paymentType: data['payment_type'],
-      maxAttendees: data['max_attendees'],
-      currentAttendees: data['currentAttendees'],
-      imageUrl: data['image_url'],
-      isCompleted: data['is_completed'],
-      organizerName: data['organizerName'],
-      organizerImageUrl: data['organizerImageUrl'],
-      comments: data['comments'] != null
-          ? (data['comments'] as List).map((c) => Comment.fromMap(c)).toList()
-          : null,
-      likes: data['likes'] != null ? List<String>.from(data['likes']) : null,
-    );
-  }
-
-  Map<String, dynamic> toMap() {
-    return {
-      'id': id,
-      'title': title,
-      'description': description,
-      'creator_id': creatorId,
-      'start_date': startDate.toIso8601String(),
-      'location': location,
-      'category': category,
-      'payment_type': paymentType,
-      'max_attendees': maxAttendees,
-      'image_url': imageUrl,
-      'is_completed': isCompleted,
-    };
-  }
+  Map<String, dynamic> toJson() => {
+    'title': title,
+    'description': description,
+    'creator_id': creatorId,
+    'start_date': startDate.toIso8601String(),
+    'location': location,
+    'category': category,
+    'payment_type': paymentType,
+    'max_attendees': maxAttendees,
+    'image_url': imageUrl,
+    'is_completed': isCompleted,
+    'created_at': createdAt.toIso8601String(),
+    'updated_at': updatedAt.toIso8601String(),
+    'ticket_price': ticketPrice, // Add this to the JSON
+  };
 }

@@ -12,16 +12,17 @@ import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:cmc_ev/screens/stagiaire/provider/user_provider.dart';
 import 'package:flutter/widgets.dart';
+import 'package:cmc_ev/db/SupabaseConfig.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
   await SupabaseConfig.initialize();
-  runApp(
-    ChangeNotifierProvider(
-      create: (_) => UserProvider(),
-      child: const MyApp(),
-    ),
-  );
+
+  runApp(const MyApp());
+  print("Supabase initialized successfully");
+  // You can now use SupabaseConfig.client to access the Supabase client
+  
 }
 
 class MyApp extends StatelessWidget {

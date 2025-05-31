@@ -68,7 +68,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 backgroundImage: _image != null
                     ? FileImage(_image!)
                     : (widget.user.profilePicture != null
-                        ? NetworkImage(widget.user.profilePicture!)
+                        ? NetworkImage(widget.user.profilePicture!) as ImageProvider<Object>
                         : null),
                 child: _image == null && widget.user.profilePicture == null
                     ? const Icon(Icons.person, size: 50)

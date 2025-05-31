@@ -359,7 +359,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                               backgroundImage: _image != null
                                   ? FileImage(_image!)
                                   : (user!.profilePicture != null
-                                      ? NetworkImage(user!.profilePicture!)
+                                      ? NetworkImage(user!.profilePicture!) as ImageProvider<Object>
                                       : null),
                               child: user!.profilePicture == null && _image == null
                                   ? const Icon(Icons.person, size: 50)

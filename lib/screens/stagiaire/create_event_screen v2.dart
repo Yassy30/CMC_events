@@ -8,9 +8,6 @@ import '../../db/SupabaseConfig.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 import 'dart:math';
-import 'dart:typed_data';
-import 'dart:ui' as ui;
-import 'package:flutter/rendering.dart';
 
 class CreateEventScreen extends StatefulWidget {
   const CreateEventScreen({super.key});
@@ -565,88 +562,60 @@ class _ImagePickerState extends State<_ImagePicker> {
   String? _uploadedImageUrl;
   bool _isUploading = false;
 
-  Future<ui.Image> _generatePlaceholderImage(String text) async {
-    final recorder = ui.PictureRecorder();
-    final canvas = Canvas(recorder);
-    const size = Size(400, 200);
+  // Replace with your Hugging Face API token
+  final String _huggingFaceApiToken = 'YOUR_HUGGING_FACE_API_TOKEN';
 
-    // Draw a random background color
-    final Random random = Random();
-    final color = Color.fromRGBO(
-      random.nextInt(256),
-      random.nextInt(256),
-      random.nextInt(256),
-      1.0,
-    );
-    canvas.drawRect(
-      Rect.fromLTWH(0, 0, size.width, size.height),
-      Paint()..color = color,
-    );
-
-    // Draw text
-    final textPainter = TextPainter(
-      text: TextSpan(
-        text: text.length > 20 ? '${text.substring(0, 20)}...' : text,
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 20,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
-      textDirection: TextDirection.ltr,
-    );
-    textPainter.layout(minWidth: 0, maxWidth: size.width);
-    textPainter.paint(
-      canvas,
-      const Offset(10, 10),
-    );
-
-    final picture = recorder.endRecording();
-    final img = await picture.toImage(size.width.toInt(), size.height.toInt());
-    return img;
-  }
-
-  Future<void> _generateAndUploadImage() async {
+  Future<void> _generateImageManually(BuildContext context) async {
     final description = widget.descriptionController.text.isNotEmpty
         ? widget.descriptionController.text
         : widget.promptController.text.isNotEmpty
             ? widget.promptController.text
-            : 'Event Image';
+            : 'a generic event';
 
     setState(() => _isUploading = true);
 
     try {
-      // Generate the placeholder image
-      final image = await _generatePlaceholderImage(description);
-
-      // Convert ui.Image to byte data
-      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
-      if (byteData == null) throw Exception('Failed to convert image to bytes');
-      final imageBytes = byteData.buffer.asUint8List();
-
-      // Upload to Supabase
-      final fileName = 'generated_event_${DateTime.now().millisecondsSinceEpoch}.png';
-      final path = 'public/$fileName';
-      await SupabaseConfig.client.storage.from('eventimages').uploadBinary(path, imageBytes);
-
-      // Get the public URL
-      final imageUrl = SupabaseConfig.client.storage.from('eventimages').getPublicUrl(path);
-
-      setState(() {
-        _uploadedImageUrl = imageUrl;
-        _isUploading = false;
-      });
-
-      widget.onImageSelected?.call(imageUrl);
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Image generated and uploaded successfully')),
+      final response = await http.post(
+        Uri.parse('https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-2-1'),
+        headers: {
+          'Authorization': 'Bearer $_huggingFaceApiToken',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'inputs': 'a vibrant $description event, colorful, festive atmosphere, high quality',
+        }),
       );
+
+      if (response.statusCode == 200) {
+        // The response is a binary image (e.g., PNG)
+        final imageBytes = response.bodyBytes;
+
+        // Upload the generated image to Supabase
+        final fileName = 'generated_event_${DateTime.now().millisecondsSinceEpoch}.png';
+        final path = 'public/$fileName';
+        await SupabaseConfig.client.storage.from('eventimages').uploadBinary(path, imageBytes);
+
+        // Get the public URL
+        final imageUrl = SupabaseConfig.client.storage.from('eventimages').getPublicUrl(path);
+
+        setState(() {
+          _uploadedImageUrl = imageUrl;
+          _isUploading = false;
+        });
+
+        widget.onImageSelected?.call(imageUrl);
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Image generated and uploaded successfully')),
+        );
+      } else {
+        throw Exception('Failed to generate image: ${response.statusCode}');
+      }
     } catch (e) {
       setState(() => _isUploading = false);
-      print('Error generating/uploading image: $e');
+      print('Error generating image: $e');
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to generate or upload image.')),
+        const SnackBar(content: Text('Failed to generate image.')),
       );
     }
   }
@@ -700,7 +669,7 @@ class _ImagePickerState extends State<_ImagePicker> {
               title: const Text('Generate Image'),
               onTap: () {
                 Navigator.pop(context);
-                _generateAndUploadImage();
+                _generateImageManually(context);
               },
             ),
           ],
