@@ -3,7 +3,6 @@ import 'package:cmc_ev/models/user.dart' as local_user;
 import 'package:cmc_ev/navigation/bottom_navigation.dart';
 import 'package:cmc_ev/screens/admin/admin_dashboard.dart';
 import 'package:cmc_ev/screens/stagiaire/autho/auth_screen.dart';
-import 'package:cmc_ev/screens/stagiaire/home_screen.dart';
 import 'package:cmc_ev/screens/stagiaire/profil/profile_screen.dart';
 import 'package:cmc_ev/screens/stagiaire/splash_screen.dart';
 import 'package:cmc_ev/theme/app_theme.dart';
@@ -11,8 +10,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:cmc_ev/screens/stagiaire/provider/user_provider.dart';
-import 'package:flutter/widgets.dart';
-import 'package:cmc_ev/db/SupabaseConfig.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -21,8 +18,6 @@ void main() async {
 
   runApp(const MyApp());
   print("Supabase initialized successfully");
-  // You can now use SupabaseConfig.client to access the Supabase client
-  
 }
 
 class MyApp extends StatelessWidget {
@@ -30,59 +25,68 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'IN\'CMC',
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.lightTheme,
-      initialRoute: '/splash',
-      routes: {
-        '/splash': (context) => const SplashScreen(),
-        '/auth': (context) => const AuthScreen(),
-        '/home': (context) => const MainNavigation(),
-        '/profile': (context) => const ProfileScreen(),
-        '/admin': (context) => const AdminDashboard(),
-      },
-      home: StreamBuilder<AuthState>(
-        stream: Supabase.instance.client.auth.onAuthStateChange,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const SplashScreen();
-          }
-          return FutureBuilder<void>(
-            future: Future.delayed(const Duration(seconds: 2)),
-            builder: (context, delaySnapshot) {
-              if (delaySnapshot.connectionState == ConnectionState.waiting) {
-                return const SplashScreen();
-              }
-              final session = snapshot.data?.session;
-              if (session == null) {
-                return const AuthScreen();
-              }
-              return FutureBuilder<local_user.User?>(
-                future: _fetchUser(session.user.id),
-                builder: (context, userSnapshot) {
-                  if (userSnapshot.connectionState == ConnectionState.waiting) {
-                    return const SplashScreen();
-                  }
-                  if (userSnapshot.hasError || userSnapshot.data == null) {
-                    print('User fetch error or null: ${userSnapshot.error}');
-                    Supabase.instance.client.auth.signOut();
-                    return const AuthScreen();
-                  }
-                  final user = userSnapshot.data!;
-                  // Set user outside build phase
-                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                    Provider.of<UserProvider>(context, listen: false).setUser(user);
-                  });
-                  print('Initial navigation to ${user.role == 'admin' ? '/admin' : '/home'} for user: ${user.id}');
-                  return user.role == 'admin' ? const AdminDashboard() : const MainNavigation();
-                },
-              );
-            },
-          );
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => UserProvider()),
+      ],
+      child: MaterialApp(
+        title: 'IN\'CMC',
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.lightTheme,
+        initialRoute: '/splash',
+        routes: {
+          '/splash': (context) => const SplashScreen(),
+          '/auth': (context) => const AuthScreen(),
+          '/home': (context) => const MainNavigation(),
+          '/profile': (context) => const ProfileScreen(),
+          '/admin': (context) => const AdminDashboard(),
         },
+        home: const AuthWrapper(),
       ),
     );
+  }
+}
+
+class AuthWrapper extends StatefulWidget {
+  const AuthWrapper({super.key});
+
+  @override
+  _AuthWrapperState createState() => _AuthWrapperState();
+}
+
+class _AuthWrapperState extends State<AuthWrapper> {
+  @override
+  void initState() {
+    super.initState();
+    _checkAuthState();
+  }
+
+  Future<void> _checkAuthState() async {
+    final supabase = Supabase.instance.client;
+    final session = supabase.auth.currentSession;
+
+    if (session == null) {
+      if (mounted) {
+        Navigator.pushReplacementNamed(context, '/auth');
+      }
+      return;
+    }
+
+    final user = await _fetchUser(session.user.id);
+    if (user == null) {
+      await supabase.auth.signOut();
+      if (mounted) {
+        Navigator.pushReplacementNamed(context, '/auth');
+      }
+      return;
+    }
+
+    if (mounted) {
+      Provider.of<UserProvider>(context, listen: false).setUser(user);
+      final route = user.role == 'admin' ? '/admin' : '/home';
+      print('Initial navigation to $route for user: ${user.id}');
+      Navigator.pushReplacementNamed(context, route);
+    }
   }
 
   Future<local_user.User?> _fetchUser(String userId) async {
@@ -97,5 +101,10 @@ class MyApp extends StatelessWidget {
       print('Error fetching user: $e');
       return null;
     }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return const SplashScreen();
   }
 }

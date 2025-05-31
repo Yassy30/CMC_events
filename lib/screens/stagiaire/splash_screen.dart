@@ -1,8 +1,6 @@
-import 'package:cmc_ev/navigation/bottom_navigation.dart';
-import 'package:cmc_ev/theme/app_theme.dart';
 import 'package:flutter/material.dart';
-import 'package:cmc_ev/screens/stagiaire/home_screen.dart';
 import 'package:cmc_ev/screens/stagiaire/autho/auth_screen.dart';
+import 'package:cmc_ev/theme/app_theme.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -15,12 +13,17 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
-    Future.delayed(const Duration(seconds: 2), () {
+    _navigateAfterDelay();
+  }
+
+  Future<void> _navigateAfterDelay() async {
+    await Future.delayed(const Duration(seconds: 2));
+    if (mounted) {
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) =>  AuthScreen()),
+        MaterialPageRoute(builder: (context) => const AuthScreen()),
       );
-    });
+    }
   }
 
   @override
