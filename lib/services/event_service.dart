@@ -1,4 +1,3 @@
-import 'dart:ffi';
 
 import 'package:cmc_ev/repositories/event_repository.dart';
 import '../models/event.dart';

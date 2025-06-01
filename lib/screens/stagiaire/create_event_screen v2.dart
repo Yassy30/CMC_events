@@ -1,6 +1,6 @@
 import 'dart:convert';
+import 'package:cmc_ev/screens/stagiaire/image_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../navigation/bottom_navigation.dart';
 import '../../services/event_service.dart';
@@ -12,11 +12,14 @@ import 'dart:math';
 class CreateEventScreen extends StatefulWidget {
   const CreateEventScreen({super.key});
 
+
   @override
   State<CreateEventScreen> createState() => _CreateEventScreenState();
 }
 
 class _CreateEventScreenState extends State<CreateEventScreen> {
+
+
   final _formKey = GlobalKey<FormState>();
   bool _isFree = true;
   final _titleController = TextEditingController();
@@ -267,7 +270,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         child: ListView(
           padding: const EdgeInsets.all(16.0),
           children: [
-            _ImagePicker(
+            ImagePickerEvent(
               onImageSelected: (url) => setState(() => _imageUrl = url),
               descriptionController: _descriptionController,
               promptController: _promptController,
@@ -481,7 +484,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
               title: const Text('Generate Image'),
               onTap: () {
                 Navigator.pop(context);
-                // Handled in _ImagePickerState
+                // Handled in ImagePickerEventState
               },
             ),
           ],
@@ -539,206 +542,5 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         ),
       ),
     );
-  }
-}
-
-class _ImagePicker extends StatefulWidget {
-  final Function(String)? onImageSelected;
-  final TextEditingController descriptionController;
-  final TextEditingController promptController;
-
-  const _ImagePicker({
-    this.onImageSelected,
-    required this.descriptionController,
-    required this.promptController,
-  });
-
-  @override
-  State<_ImagePicker> createState() => _ImagePickerState();
-}
-
-class _ImagePickerState extends State<_ImagePicker> {
-  final ImagePicker _picker = ImagePicker();
-  String? _uploadedImageUrl;
-  bool _isUploading = false;
-
-  // Replace with your Hugging Face API token
-  final String _huggingFaceApiToken = 'YOUR_HUGGING_FACE_API_TOKEN';
-
-  Future<void> _generateImageManually(BuildContext context) async {
-    final description = widget.descriptionController.text.isNotEmpty
-        ? widget.descriptionController.text
-        : widget.promptController.text.isNotEmpty
-            ? widget.promptController.text
-            : 'a generic event';
-
-    setState(() => _isUploading = true);
-
-    try {
-      final response = await http.post(
-        Uri.parse('https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-2-1'),
-        headers: {
-          'Authorization': 'Bearer $_huggingFaceApiToken',
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode({
-          'inputs': 'a vibrant $description event, colorful, festive atmosphere, high quality',
-        }),
-      );
-
-      if (response.statusCode == 200) {
-        // The response is a binary image (e.g., PNG)
-        final imageBytes = response.bodyBytes;
-
-        // Upload the generated image to Supabase
-        final fileName = 'generated_event_${DateTime.now().millisecondsSinceEpoch}.png';
-        final path = 'public/$fileName';
-        await SupabaseConfig.client.storage.from('eventimages').uploadBinary(path, imageBytes);
-
-        // Get the public URL
-        final imageUrl = SupabaseConfig.client.storage.from('eventimages').getPublicUrl(path);
-
-        setState(() {
-          _uploadedImageUrl = imageUrl;
-          _isUploading = false;
-        });
-
-        widget.onImageSelected?.call(imageUrl);
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Image generated and uploaded successfully')),
-        );
-      } else {
-        throw Exception('Failed to generate image: ${response.statusCode}');
-      }
-    } catch (e) {
-      setState(() => _isUploading = false);
-      print('Error generating image: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to generate image.')),
-      );
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () => _showImageChoiceDialog(context),
-      child: Container(
-        height: 200,
-        width: double.infinity,
-        decoration: BoxDecoration(
-          border: Border.all(color: Colors.grey),
-          borderRadius: BorderRadius.circular(4),
-        ),
-        child: _isUploading
-            ? const Center(child: CircularProgressIndicator())
-            : _uploadedImageUrl != null
-                ? Image.network(
-                    _uploadedImageUrl!,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) => const Center(
-                      child: Icon(Icons.error_outline, size: 50, color: Colors.red),
-                    ),
-                  )
-                : const Center(
-                    child: Icon(Icons.add_photo_alternate, size: 50),
-                  ),
-      ),
-    );
-  }
-
-  void _showImageChoiceDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Choose Image Option'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.image),
-              title: const Text('Upload Image'),
-              onTap: () {
-                Navigator.pop(context);
-                _showImageSourceActionSheet(context);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.auto_awesome),
-              title: const Text('Generate Image'),
-              onTap: () {
-                Navigator.pop(context);
-                _generateImageManually(context);
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showImageSourceActionSheet(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      builder: (_) => SafeArea(
-        child: Wrap(
-          children: [
-            ListTile(
-              leading: const Icon(Icons.photo_library),
-              title: const Text('Gallery'),
-              onTap: () {
-                Navigator.of(context).pop();
-                _pickAndUploadImage(ImageSource.gallery);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.camera_alt),
-              title: const Text('Camera'),
-              onTap: () {
-                Navigator.of(context).pop();
-                _pickAndUploadImage(ImageSource.camera);
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Future<void> _pickAndUploadImage(ImageSource source) async {
-    try {
-      final XFile? image = await _picker.pickImage(source: source);
-      if (image == null) return;
-
-      setState(() => _isUploading = true);
-
-      final File imageFile = File(image.path);
-      final String fileName = 'event_${DateTime.now().millisecondsSinceEpoch}.png';
-      final String path = 'public/$fileName';
-
-      await SupabaseConfig.client.storage.from('eventimages').upload(path, imageFile);
-
-      final String publicUrl = SupabaseConfig.client.storage
-          .from('eventimages')
-          .getPublicUrl(path);
-
-      setState(() {
-        _uploadedImageUrl = publicUrl;
-        _isUploading = false;
-      });
-
-      widget.onImageSelected?.call(publicUrl);
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Image uploaded successfully')),
-      );
-    } catch (e) {
-      setState(() => _isUploading = false);
-      print('Error picking/uploading image: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to pick or upload image.')),
-      );
-    }
   }
 }
