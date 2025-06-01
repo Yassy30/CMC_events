@@ -1,10 +1,11 @@
-// import 'dart:ffi';
-
 import 'package:cmc_ev/repositories/event_repository.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../db/SupabaseConfig.dart';
 import '../models/event.dart';
 
 class EventService {
   final EventRepository _repository;
+  final _client = SupabaseConfig.client;
 
   EventService({EventRepository? repository})
       : _repository = repository ?? EventRepository();
@@ -18,7 +19,7 @@ class EventService {
     required String category,
     required String paymentType,
     int? maxAttendees,
-    required String imageUrl, 
+    required String imageUrl,
     double? ticketPrice,
   }) async {
     // Validate creatorId
@@ -47,5 +48,46 @@ class EventService {
     print('Event JSON before repository call: $eventJson');
 
     return await _repository.createEvent(event);
+  }
+
+  Future<List<Event>> getEvents({String? category}) async {
+    try {
+      return await _repository.getEvents(category: category);
+    } catch (e) {
+      print('Error fetching events: $e');
+      return [];
+    }
+  }
+
+  Future<int> getCommentsCount(String eventId) async {
+    try {
+      // Use simple select and count the response length
+      final response = await _client
+          .from('comments')
+          .select()
+          .eq('event_id', eventId);
+      
+      // Count manually
+      return response.length;
+    } catch (e) {
+      print('Error getting comments count: $e');
+      return 0;
+    }
+  }
+
+  Future<int> getReservationsCount(String eventId) async {
+    try {
+      // Use simple select and count the response length
+      final response = await _client
+          .from('reservations')
+          .select()
+          .eq('event_id', eventId);
+      
+      // Count manually
+      return response.length;
+    } catch (e) {
+      print('Error getting reservations count: $e');
+      return 0;
+    }
   }
 }
