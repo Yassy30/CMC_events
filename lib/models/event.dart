@@ -71,7 +71,7 @@ class Event {
   final String id;
   final String title;
   final String description;
-  final String creatorId;
+  final String? creatorId;
   final DateTime startDate;
   final String location;
   final String category;

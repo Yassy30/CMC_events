@@ -1,6 +1,7 @@
 // import 'dart:ffi';
 
 import 'package:cmc_ev/repositories/event_repository.dart';
+import 'package:cmc_ev/services/auth_service.dart';
 import '../models/event.dart';
 
 class EventService {
@@ -26,10 +27,11 @@ class EventService {
       throw Exception('creatorId cannot be empty in EventService');
     }
 
+    final AuthService _authService = AuthService();
     final event = Event(
       title: title,
       description: description,
-      creatorId: "88fc2b88-b79f-4955-ba03-315de8fc5ed2",
+      creatorId: _authService.getCurrentUser()?.id,
       startDate: startDate,
       location: location,
       category: category,
