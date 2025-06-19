@@ -34,7 +34,15 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   String? _selectedCategory;
   final _eventService = EventService();
 
-  final List<String> _categories = ['sport', 'culture', 'competition', 'other'];
+  final List<String> _categories = [
+    'All Events',
+    'Art & Design',
+    'Sports',
+    'Gaming',
+    'Music',
+    'Tech',
+    'Other'
+  ];
 
   @override
   void initState() {
@@ -163,6 +171,21 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     return null;
   }
 
+  String _mapDisplayCategoryToDatabase(String displayCategory) {
+    // Map from display categories to database categories
+    final Map<String, String> categoryMap = {
+      'All Events': 'other',
+      'Art & Design': 'culture',
+      'Sports': 'sport',
+      'Gaming': 'competition',
+      'Music': 'music',
+      'Tech': 'tech',
+      'Other': 'other',
+    };
+    
+    return categoryMap[displayCategory] ?? 'other';
+  }
+
   Future<void> _createEvent() async {
     if (!_formKey.currentState!.validate()) return;
     if (_selectedDate == null || _selectedTime == null) {
@@ -217,7 +240,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         creatorId: creatorId,
         startDate: startDate,
         location: _locationController.text,
-        category: _selectedCategory!,
+        category: _mapDisplayCategoryToDatabase(_selectedCategory!),
         paymentType: paymentType,
         ticketPrice: ticketPrice,
         maxAttendees: int.tryParse(_maxAttendeesController.text),

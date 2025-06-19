@@ -1,118 +1,86 @@
-// import 'dart:ffi';
+import 'dart:convert';
 
-// class Event {
-//   final String id;
-//   final String title;
-//   final String? description;
-//   final String creatorId;
-//   final DateTime startDate;
-//   final String? location;
-//   final String category;
-//   final String paymentType;
-//   final int? maxAttendees;
-//   final String imageUrl;
-//   final bool isCompleted;
-//   final double? ticketPrice;
-//   final DateTime createdAt;
-//   final DateTime updatedAt;
-
-//   Event({
-//     this.id = '',
-//     required this.title,
-//     this.description,
-//     this.ticketPrice,
-//     required this.creatorId,
-//     required this.startDate,
-//     this.location,
-//     required this.category,
-//     required this.paymentType,
-//     this.maxAttendees,
-//     required this.imageUrl,
-//     required this.isCompleted,
-//     required this.createdAt,
-//     required this.updatedAt,
-//   });
-
-//   factory Event.fromJson(Map<String, dynamic> json) => Event(
-//     id: json['id'],
-//     title: json['title'],
-//     description: json['description'],
-//     // creatorId: json['creator_id'],
-//     creatorId: json['creator_id'],
-//     startDate: DateTime.parse(json['start_date']),
-//     location: json['location'],
-//     category: json['category'],
-//     paymentType: json['payment_type'],
-//     maxAttendees: json['max_attendees'],
-//     imageUrl: json['image_url'],
-//     isCompleted: json['is_completed'],
-//     ticketPrice: (json['ticket_price'] as num?)?.toDouble(),
-//     createdAt: DateTime.parse(json['created_at']),
-//     updatedAt: DateTime.parse(json['updated_at']),
-//   );
-
-//   Map<String, dynamic> toJson() => {
-//     // 'id': id,
-//     'title': title,
-//     'description': description,
-//     'creator_id': creatorId,
-//     'start_date': startDate.toIso8601String(),
-//     'location': location,
-//     'category': category,
-//     'payment_type': paymentType,
-//     'max_attendees': maxAttendees,
-//     'image_url': imageUrl,
-//     'created_at': createdAt.toIso8601String(),
-//     'updated_at': updatedAt.toIso8601String(),
-//     'ticket_price': ticketPrice,
-//   };
-// }
 class Event {
   final String id;
   final String title;
-  final String description;
+  final String? description;
   final String creatorId;
+  final String? creatorName;
+  final String? creatorImageUrl;
   final DateTime startDate;
-  final String location;
+  final String? location;
   final String category;
   final String paymentType;
   final int? maxAttendees;
   final String imageUrl;
+  final double? ticketPrice;
   final bool isCompleted;
   final DateTime createdAt;
   final DateTime updatedAt;
-  final double? ticketPrice; // Add this field
 
   Event({
-    this.id = '',
+    String? id,
     required this.title,
-    required this.description,
+    this.description,
     required this.creatorId,
+    this.creatorName,
+    this.creatorImageUrl,
     required this.startDate,
-    required this.location,
+    this.location,
     required this.category,
     required this.paymentType,
     this.maxAttendees,
     required this.imageUrl,
+    this.ticketPrice,
     required this.isCompleted,
     required this.createdAt,
     required this.updatedAt,
-    this.ticketPrice, // Make it nullable
-  });
+  }) : id = id ?? DateTime.now().millisecondsSinceEpoch.toString();
+  
+  factory Event.fromJson(Map<String, dynamic> json) {
+    final userData = json['users'] as Map<String, dynamic>?;
+    
+    return Event(
+      id: json['id'],
+      title: json['title'],
+      description: json['description'],
+      creatorId: json['creator_id'],
+      creatorName: userData?['username'],
+      creatorImageUrl: userData?['profile_picture'],
+      startDate: DateTime.parse(json['start_date']),
+      location: json['location'],
+      category: json['category'],
+      paymentType: json['payment_type'],
+      maxAttendees: json['max_attendees'],
+      imageUrl: json['image_url'],
+      ticketPrice: json['ticket_price'] != null ? 
+          (json['ticket_price'] is double ? json['ticket_price'] : double.parse(json['ticket_price'].toString())) : null,
+      isCompleted: json['is_completed'] ?? false,
+      createdAt: DateTime.parse(json['created_at']),
+      updatedAt: DateTime.parse(json['updated_at']),
+    );
+  }
 
-  Map<String, dynamic> toJson() => {
-    'title': title,
-    'description': description,
-    'creator_id': creatorId,
-    'start_date': startDate.toIso8601String(),
-    'location': location,
-    'category': category,
-    'payment_type': paymentType,
-    'max_attendees': maxAttendees,
-    'image_url': imageUrl,
-    'is_completed': isCompleted,
-    'created_at': createdAt.toIso8601String(),
-    'updated_at': updatedAt.toIso8601String(),
-    'ticket_price': ticketPrice, // Add this to the JSON
-  };
+  Map<String, dynamic> toJson() {
+    return {
+      'title': title,
+      'description': description,
+      'creator_id': creatorId,
+      'start_date': startDate.toIso8601String(),
+      'location': location,
+      'category': category,
+      'payment_type': paymentType,
+      'max_attendees': maxAttendees,
+      'image_url': imageUrl,
+      'ticket_price': ticketPrice,
+      'is_completed': isCompleted,
+      'created_at': createdAt.toIso8601String(),
+      'updated_at': updatedAt.toIso8601String(),
+    };
+  }
+
+  @override
+  String toString() {
+    return jsonEncode(toJson());
+  }
 }

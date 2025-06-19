@@ -17,15 +17,15 @@ class Comment {
     this.userImageUrl,
   });
 
-  factory Comment.fromMap(Map<String, dynamic> data) {
+  factory Comment.fromMap(Map<String, dynamic> map) {
     return Comment(
-      id: data['id'],
-      eventId: data['event_id'],
-      userId: data['user_id'],
-      text: data['content'],
-      createdAt: DateTime.parse(data['created_at']),
-      username: data['username'] ?? 'Unknown',
-      userImageUrl: data['profile_picture'],
+      id: map['id'],
+      eventId: map['event_id'],
+      userId: map['user_id'],
+      text: map['content'] ?? map['text'],
+      createdAt: DateTime.parse(map['created_at']),
+      username: map['username'],
+      userImageUrl: map['profile_picture'] ?? map['user_image_url'],
     );
   }
 

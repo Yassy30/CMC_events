@@ -4,88 +4,95 @@ import 'package:cmc_ev/models/user.dart' as my_user;
 class AuthService {
   final SupabaseClient _supabase = Supabase.instance.client;
 
-Future<AuthResponse?> signUp(String email, String password, String username, {String role = 'stagiaire'}) async {
-  try {
-    // Check if user already exists
-    final existingUser = await _supabase
-        .from('users')
-        .select('id')
-        .eq('email', email)
-        .maybeSingle();
-    if (existingUser != null) {
-      print('User with email $email already exists');
-      throw Exception('Email already in use');
-    }
+  User? get currentUser => _supabase.auth.currentUser;
+  String get currentUserId => currentUser?.id ?? '';
+  bool get isLoggedIn => currentUser != null;
 
-    final response = await _supabase.auth.signUp(
-      email: email,
-      password: password,
-      data: {'username': username, 'role': role},
-    );
-    if (response.user != null) {
-      print('User created: id=${response.user!.id}, email=$email, role=$role');
+  Stream<AuthState> get authStateChanges => _supabase.auth.onAuthStateChange;
 
-      try {
-        final insertResponse = await _supabase.from('users').insert({
-          'id': response.user!.id,
-          'email': email,
-          'username': username,
-          'role': role,
-          'created_at': DateTime.now().toIso8601String(),
-        });
-        print('Insert response: $insertResponse');
-      } catch (insertError) {
-        print('Insert error: $insertError');
+  Future<AuthResponse?> signUp(String email, String password, String username, {String role = 'stagiaire'}) async {
+    try {
+      // Check if user already exists
+      final existingUser = await _supabase
+          .from('users')
+          .select('id')
+          .eq('email', email)
+          .maybeSingle();
+      if (existingUser != null) {
+        print('User with email $email already exists');
+        throw Exception('Email already in use');
+      }
+
+      final response = await _supabase.auth.signUp(
+        email: email,
+        password: password,
+        data: {'username': username, 'role': role},
+      );
+      
+      if (response.user != null) {
+        print('User created: id=${response.user!.id}, email=$email, role=$role');
+
+        try {
+          final insertResponse = await _supabase.from('users').insert({
+            'id': response.user!.id,
+            'email': email,
+            'username': username,
+            'role': role,
+            'created_at': DateTime.now().toIso8601String(),
+          });
+          print('Insert response: $insertResponse');
+        } catch (insertError) {
+          print('Insert error: $insertError');
+          rethrow;
+        }
+
+        print('User inserted: id=${response.user!.id}');
+        if (response.session != null) {
+          await _supabase.auth.setSession(response.session!.refreshToken!);
+          print('Session set: user=${response.user!.id}');
+        }
+        return response;
+      }
+      print('Sign-up failed: No user returned');
+      return null;
+    } catch (e) {
+      if (e.toString().contains('over_email_send_rate_limit')) {
+        print('Sign-up error: Email send rate limit exceeded. Please wait 42 seconds and try again.');
         rethrow;
       }
-
-      print('User inserted: id=${response.user!.id}');
-      if (response.session != null) {
-        await _supabase.auth.setSession(response.session!.refreshToken!);
-        print('Session set: user=${response.user!.id}');
-      }
-      return response;
-    }
-    print('Sign-up failed: No user returned');
-    return null;
-  } catch (e) {
-    if (e.toString().contains('over_email_send_rate_limit')) {
-      print('Sign-up error: Email send rate limit exceeded. Please wait 42 seconds and try again.');
+      print('Sign-up error: $e');
       rethrow;
     }
-    print('Sign-up error: $e');
-    rethrow;
   }
-}
 
-Future<AuthResponse?> signIn(String email, String password) async {
-  try {
-    final response = await _supabase.auth.signInWithPassword(
-      email: email,
-      password: password,
-    );
-    print('Sign-in successful: id=${response.user?.id}');
+  Future<AuthResponse?> signIn(String email, String password) async {
+    try {
+      final response = await _supabase.auth.signInWithPassword(
+        email: email,
+        password: password,
+      );
+      print('Sign-in successful: id=${response.user?.id}');
 
-    // Check if user exists in users table, if not, insert
-    final user = await getUserFromTable(response.user!.id);
-    if (user == null) {
-      print('User not found in users table, creating...');
-      await _supabase.from('users').insert({
-        'id': response.user!.id,
-        'email': email,
-        'username': response.user!.userMetadata?['username'] ?? 'default_user',
-        'role': response.user!.userMetadata?['role'] ?? 'stagiaire',
-        'created_at': DateTime.now().toIso8601String(),
-      });
-      print('User created in users table: id=${response.user!.id}');
+      // Check if user exists in users table, if not, insert
+      final user = await getUserFromTable(response.user!.id);
+      if (user == null) {
+        print('User not found in users table, creating...');
+        await _supabase.from('users').insert({
+          'id': response.user!.id,
+          'email': email,
+          'username': response.user!.userMetadata?['username'] ?? 'default_user',
+          'role': response.user!.userMetadata?['role'] ?? 'stagiaire',
+          'created_at': DateTime.now().toIso8601String(),
+        });
+        print('User created in users table: id=${response.user!.id}');
+      }
+
+      return response;
+    } catch (e) {
+      print('Sign-in error: $e');
+      rethrow;
     }
-
-    return response;
-  } catch (e) {
-    print('Sign-in error: $e');
-    rethrow;
   }
-}
 
   Future<void> signOut() async {
     await _supabase.auth.signOut();
@@ -117,6 +124,4 @@ Future<AuthResponse?> signIn(String email, String password) async {
       return null;
     }
   }
-
-  Stream<AuthState> get authStateChanges => _supabase.auth.onAuthStateChange;
 }
