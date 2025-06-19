@@ -1,6 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../db/SupabaseConfig.dart';
 import '../models/event.dart';
+import 'dart:convert';
 
 class EventRepository {
   Future<String> createEvent(Event event) async {

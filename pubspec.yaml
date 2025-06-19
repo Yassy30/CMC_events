@@ -43,6 +43,9 @@ dev_dependencies:
     sdk: flutter
   supabase_flutter: ^2.0.0  # For Supabase integration
   flutter_dotenv: ^5.0.0   # For loading .env files
+  provider: ^6.1.1  # or the latest version
+  share_plus: ^7.2.2
+  timeago: ^3.7.0
   intl: ^0.18.1
   url_launcher: ^6.2.5
   http: ^1.2.2

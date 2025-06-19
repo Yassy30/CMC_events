@@ -1,546 +1,547 @@
-import 'dart:convert';
-import 'package:cmc_ev/screens/stagiaire/image_picker.dart';
-import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
-import '../../navigation/bottom_navigation.dart';
-import '../../services/event_service.dart';
-import '../../db/SupabaseConfig.dart';
-import 'dart:io';
-import 'package:image_picker/image_picker.dart';
-import 'dart:math';
+// import 'dart:convert';
+// import 'package:cmc_ev/screens/stagiaire/image_picker.dart';
+// import 'package:flutter/material.dart';
+// import 'package:supabase_flutter/supabase_flutter.dart';
+// import '../../navigation/bottom_navigation.dart';
+// import '../../services/event_service.dart';
+// import '../../db/SupabaseConfig.dart';
+// import 'dart:io';
+// import 'package:image_picker/image_picker.dart';
+// import 'dart:math';
 
-class CreateEventScreen extends StatefulWidget {
-  const CreateEventScreen({super.key});
-
-
-  @override
-  State<CreateEventScreen> createState() => _CreateEventScreenState();
-}
-
-class _CreateEventScreenState extends State<CreateEventScreen> {
+// class CreateEventScreen extends StatefulWidget {
+//   const CreateEventScreen({super.key});
 
 
-  final _formKey = GlobalKey<FormState>();
-  bool _isFree = true;
-  final _titleController = TextEditingController();
-  final _descriptionController = TextEditingController();
-  final _promptController = TextEditingController();
-  final _locationController = TextEditingController();
-  final _maxAttendeesController = TextEditingController();
-  final _priceController = TextEditingController();
-  DateTime? _selectedDate;
-  TimeOfDay? _selectedTime;
-  String? _imageUrl;
-  String? _selectedCategory;
-  final _eventService = EventService();
+//   @override
+//   State<CreateEventScreen> createState() => _CreateEventScreenState();
+// }
 
-  final List<String> _categories = ['sport', 'culture', 'competition', 'other'];
+// class _CreateEventScreenState extends State<CreateEventScreen> {
 
-  @override
-  void initState() {
-    super.initState();
-    _selectedCategory = _categories[0];
-  }
 
-  @override
-  void dispose() {
-    _titleController.dispose();
-    _descriptionController.dispose();
-    _promptController.dispose();
-    _locationController.dispose();
-    _maxAttendeesController.dispose();
-    _priceController.dispose();
-    super.dispose();
-  }
+//   final _formKey = GlobalKey<FormState>();
+//   bool _isFree = true;
+//   final _titleController = TextEditingController();
+//   final _descriptionController = TextEditingController();
+//   final _promptController = TextEditingController();
+//   final _locationController = TextEditingController();
+//   final _maxAttendeesController = TextEditingController();
+//   final _priceController = TextEditingController();
+//   DateTime? _selectedDate;
+//   TimeOfDay? _selectedTime;
+//   String? _imageUrl;
+//   String? _selectedCategory;
+//   final _eventService = EventService();
 
-  Future<Map<String, String>> _generateText(String prompt) async {
-    try {
-      final List<String> adjectives = ['Exciting', 'Fun', 'Amazing', 'Thrilling', 'Unique'];
-      final List<String> eventTypes = ['Festival', 'Gathering', 'Show', 'Competition', 'Experience'];
-      final Random random = Random();
+//   final List<String> _categories = ['sport', 'culture', 'competition', 'other'];
 
-      String title = prompt.trim();
-      if (title.isEmpty) {
-        title = '${adjectives[random.nextInt(adjectives.length)]} ${eventTypes[random.nextInt(eventTypes.length)]}';
-      } else {
-        title = title.split(' ').map((word) => word.isNotEmpty ? '${word[0].toUpperCase()}${word.substring(1).toLowerCase()}' : '').join(' ');
-        title = '${adjectives[random.nextInt(adjectives.length)]} $title ${eventTypes[random.nextInt(eventTypes.length)]}';
-      }
+//   @override
+//   void initState() {
+//     super.initState();
+//     _selectedCategory = _categories[0];
+//   }
 
-      String description = 'Join us for an ${adjectives[random.nextInt(adjectives.length)].toLowerCase()} event! ';
-      if (prompt.isNotEmpty) {
-        description += 'This event focuses on $prompt, offering a ${adjectives[random.nextInt(adjectives.length)].toLowerCase()} time for all. ';
-      }
-      description += 'Expect ${['live music', 'fun activities', 'great food', 'exciting games', 'special performances'][random.nextInt(5)]} ';
-      description += 'on ${DateTime.now().toString().split(' ')[0]} at a location near you. Don’t miss out!';
+//   @override
+//   void dispose() {
+//     _titleController.dispose();
+//     _descriptionController.dispose();
+//     _promptController.dispose();
+//     _locationController.dispose();
+//     _maxAttendeesController.dispose();
+//     _priceController.dispose();
+//     super.dispose();
+//   }
 
-      return {'title': title, 'description': description};
-    } catch (e) {
-      print('Error generating text: $e');
-      return {'title': 'Generated Event', 'description': 'No description generated'};
-    }
-  }
+//   Future<Map<String, String>> _generateText(String prompt) async {
+//     try {
+//       final List<String> adjectives = ['Exciting', 'Fun', 'Amazing', 'Thrilling', 'Unique'];
+//       final List<String> eventTypes = ['Festival', 'Gathering', 'Show', 'Competition', 'Experience'];
+//       final Random random = Random();
 
-  void _showAIGeneratorDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Générateur IA (100% Free)'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: _promptController,
-              decoration: const InputDecoration(
-                labelText: 'Enter a prompt for event generation',
-              ),
-              maxLines: 3,
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton(
-                onPressed: () async {
-                  if (_promptController.text.isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Please enter a prompt')),
-                    );
-                    return;
-                  }
+//       String title = prompt.trim();
+//       if (title.isEmpty) {
+//         title = '${adjectives[random.nextInt(adjectives.length)]} ${eventTypes[random.nextInt(eventTypes.length)]}';
+//       } else {
+//         title = title.split(' ').map((word) => word.isNotEmpty ? '${word[0].toUpperCase()}${word.substring(1).toLowerCase()}' : '').join(' ');
+//         title = '${adjectives[random.nextInt(adjectives.length)]} $title ${eventTypes[random.nextInt(eventTypes.length)]}';
+//       }
 
-                  showDialog(
-                    context: context,
-                    barrierDismissible: false,
-                    builder: (context) => const Center(child: CircularProgressIndicator()),
-                  );
+//       String description = 'Join us for an ${adjectives[random.nextInt(adjectives.length)].toLowerCase()} event! ';
+//       if (prompt.isNotEmpty) {
+//         description += 'This event focuses on $prompt, offering a ${adjectives[random.nextInt(adjectives.length)].toLowerCase()} time for all. ';
+//       }
+//       description += 'Expect ${['live music', 'fun activities', 'great food', 'exciting games', 'special performances'][random.nextInt(5)]} ';
+//       description += 'on ${DateTime.now().toString().split(' ')[0]} at a location near you. Don’t miss out!';
 
-                  final textResult = await _generateText(_promptController.text);
+//       return {'title': title, 'description': description};
+//     } catch (e) {
+//       print('Error generating text: $e');
+//       return {'title': 'Generated Event', 'description': 'No description generated'};
+//     }
+//   }
 
-                  Navigator.pop(context);
+//   void _showAIGeneratorDialog() {
+//     showDialog(
+//       context: context,
+//       builder: (context) => AlertDialog(
+//         title: const Text('Générateur IA (100% Free)'),
+//         content: Column(
+//           mainAxisSize: MainAxisSize.min,
+//           children: [
+//             TextField(
+//               controller: _promptController,
+//               decoration: const InputDecoration(
+//                 labelText: 'Enter a prompt for event generation',
+//               ),
+//               maxLines: 3,
+//             ),
+//             const SizedBox(height: 16),
+//             SizedBox(
+//               width: double.infinity,
+//               child: FilledButton(
+//                 onPressed: () async {
+//                   if (_promptController.text.isEmpty) {
+//                     ScaffoldMessenger.of(context).showSnackBar(
+//                       const SnackBar(content: Text('Please enter a prompt')),
+//                     );
+//                     return;
+//                   }
 
-                  setState(() {
-                    _titleController.text = textResult['title']!;
-                    _descriptionController.text = textResult['description']!;
-                  });
+//                   showDialog(
+//                     context: context,
+//                     barrierDismissible: false,
+//                     builder: (context) => const Center(child: CircularProgressIndicator()),
+//                   );
 
-                  Navigator.pop(context);
+//                   final textResult = await _generateText(_promptController.text);
 
-                  if (textResult['title']!.isNotEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Text generated successfully!')),
-                    );
-                  } else {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Error generating text')),
-                    );
-                  }
-                },
-                child: const Text('Generate Text'),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+//                   Navigator.pop(context);
 
-  Future<String?> _fetchFirstUserId() async {
-    try {
-      final response = await SupabaseConfig.client
-          .from('users')
-          .select('id')
-          .limit(1)
-          .maybeSingle();
+//                   setState(() {
+//                     _titleController.text = textResult['title']!;
+//                     _descriptionController.text = textResult['description']!;
+//                   });
 
-      if (response != null && response['id'] != null) {
-        print("the user id : ${response['id'] as String}");
-        return response['id'] as String;
-      }
-      print('No users found in the database.');
-    } catch (e) {
-      print('Error fetching first user: $e');
-    }
-    return null;
-  }
+//                   Navigator.pop(context);
 
-  Future<void> _createEvent() async {
-    if (!_formKey.currentState!.validate()) return;
-    if (_selectedDate == null || _selectedTime == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select date and time')),
-      );
-      return;
-    }
-    if (_selectedCategory == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a category')),
-      );
-      return;
-    }
+//                   if (textResult['title']!.isNotEmpty) {
+//                     ScaffoldMessenger.of(context).showSnackBar(
+//                       const SnackBar(content: Text('Text generated successfully!')),
+//                     );
+//                   } else {
+//                     ScaffoldMessenger.of(context).showSnackBar(
+//                       const SnackBar(content: Text('Error generating text')),
+//                     );
+//                   }
+//                 },
+//                 child: const Text('Generate Text'),
+//               ),
+//             ),
+//           ],
+//         ),
+//       ),
+//     );
+//   }
 
-    final creatorId = await _fetchFirstUserId();
-    if (creatorId == null || creatorId.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No users found. Please create a user first.')),
-      );
-      return;
-    }
+//   Future<String?> _fetchFirstUserId() async {
+//     try {
+//       final response = await SupabaseConfig.client
+//           .from('users')
+//           .select('id')
+//           .limit(1)
+//           .maybeSingle();
 
-    try {
-      final startDate = DateTime(
-        _selectedDate!.year,
-        _selectedDate!.month,
-        _selectedDate!.day,
-        _selectedTime!.hour,
-        _selectedTime!.minute,
-      );
+//       if (response != null && response['id'] != null) {
+//         print("the user id : ${response['id'] as String}");
+//         return response['id'] as String;
+//       }
+//       print('No users found in the database.');
+//     } catch (e) {
+//       print('Error fetching first user: $e');
+//     }
+//     return null;
+//   }
 
-      double? ticketPrice;
-      String paymentType = 'free';
-      if (!_isFree) {
-        print('Price text before parsing: "${_priceController.text}"');
-        final priceText = _priceController.text.trim();
-        ticketPrice = double.tryParse(priceText);
-        if (ticketPrice == null || ticketPrice <= 0) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Invalid ticket price. Please enter a valid positive number.')),
-          );
-          return;
-        }
-        paymentType = 'paid';
-      }
+//   Future<void> _createEvent() async {
+//     if (!_formKey.currentState!.validate()) return;
+//     if (_selectedDate == null || _selectedTime == null) {
+//       ScaffoldMessenger.of(context).showSnackBar(
+//         const SnackBar(content: Text('Please select date and time')),
+//       );
+//       return;
+//     }
+//     if (_selectedCategory == null) {
+//       ScaffoldMessenger.of(context).showSnackBar(
+//         const SnackBar(content: Text('Please select a category')),
+//       );
+//       return;
+//     }
 
-      print('Creating event with creatorId: $creatorId, paymentType: $paymentType, ticketPrice: $ticketPrice');
-      await _eventService.createEvent(
-        title: _titleController.text,
-        description: _descriptionController.text,
-        creatorId: creatorId,
-        startDate: startDate,
-        location: _locationController.text,
-        category: _selectedCategory!,
-        paymentType: paymentType,
-        ticketPrice: ticketPrice,
-        maxAttendees: int.tryParse(_maxAttendeesController.text),
-        imageUrl: _imageUrl ?? 'https://via.placeholder.com/150',
-      );
+//     final creatorId = await _fetchFirstUserId();
+//     if (creatorId == null || creatorId.isEmpty) {
+//       ScaffoldMessenger.of(context).showSnackBar(
+//         const SnackBar(content: Text('No users found. Please create a user first.')),
+//       );
+//       return;
+//     }
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Event created successfully!')),
-        );
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const MainNavigation()),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        print('Failed to create event: $e');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to create event: $e')),
-        );
-      }
-    }
-  }
+//     try {
+//       final startDate = DateTime(
+//         _selectedDate!.year,
+//         _selectedDate!.month,
+//         _selectedDate!.day,
+//         _selectedTime!.hour,
+//         _selectedTime!.minute,
+//       );
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Créer un événement'),
-      ),
-      floatingActionButton: Column(
-        mainAxisAlignment: MainAxisAlignment.end,
-        children: [
-          FloatingActionButton(
-            onPressed: _showAIGeneratorDialog,
-            child: const Icon(Icons.text_fields),
-            heroTag: 'textGenerator',
-          ),
-          const SizedBox(height: 10),
-          FloatingActionButton(
-            onPressed: _showImageChoiceDialog,
-            child: const Icon(Icons.image),
-            heroTag: 'imageChoice',
-          ),
-        ],
-      ),
-      body: Form(
-        key: _formKey,
-        child: ListView(
-          padding: const EdgeInsets.all(16.0),
-          children: [
-            ImagePickerEvent(
-              onImageSelected: (url) => setState(() => _imageUrl = url),
-              descriptionController: _descriptionController,
-              promptController: _promptController,
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _titleController,
-              decoration: const InputDecoration(
-                labelText: 'Titre de l\'événement',
-                border: OutlineInputBorder(),
-              ),
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Veuillez entrer un titre';
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _descriptionController,
-              decoration: const InputDecoration(
-                labelText: 'Description',
-                border: OutlineInputBorder(),
-              ),
-              maxLines: 3,
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Veuillez entrer une description';
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 16),
-            DropdownButtonFormField<String>(
-              value: _selectedCategory,
-              decoration: const InputDecoration(
-                labelText: 'Catégorie',
-                border: OutlineInputBorder(),
-              ),
-              items: _categories.map((String category) {
-                return DropdownMenuItem<String>(
-                  value: category,
-                  child: Text(category[0].toUpperCase() + category.substring(1)),
-                );
-              }).toList(),
-              onChanged: (String? newValue) {
-                setState(() {
-                  _selectedCategory = newValue;
-                });
-              },
-              validator: (value) {
-                if (value == null) {
-                  return 'Veuillez sélectionner une catégorie';
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: TextFormField(
-                    decoration: const InputDecoration(
-                      labelText: 'Date',
-                      border: OutlineInputBorder(),
-                      suffixIcon: Icon(Icons.calendar_today),
-                    ),
-                    readOnly: true,
-                    controller: TextEditingController(
-                      text: _selectedDate != null
-                          ? '${_selectedDate!.day}/${_selectedDate!.month}/${_selectedDate!.year}'
-                          : '',
-                    ),
-                    onTap: () async {
-                      final date = await showDatePicker(
-                        context: context,
-                        initialDate: DateTime.now(),
-                        firstDate: DateTime.now(),
-                        lastDate: DateTime.now().add(const Duration(days: 365)),
-                      );
-                      if (date != null) {
-                        setState(() => _selectedDate = date);
-                      }
-                    },
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: TextFormField(
-                    decoration: const InputDecoration(
-                      labelText: 'Heure',
-                      border: OutlineInputBorder(),
-                      suffixIcon: Icon(Icons.access_time),
-                    ),
-                    readOnly: true,
-                    controller: TextEditingController(
-                      text: _selectedTime != null
-                          ? _selectedTime!.format(context)
-                          : '',
-                    ),
-                    onTap: () async {
-                      final time = await showTimePicker(
-                        context: context,
-                        initialTime: TimeOfDay.now(),
-                      );
-                      if (time != null) {
-                        setState(() => _selectedTime = time);
-                      }
-                    },
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _locationController,
-              decoration: const InputDecoration(
-                labelText: 'Lieu',
-                border: OutlineInputBorder(),
-                suffixIcon: Icon(Icons.location_on),
-              ),
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Veuillez entrer un lieu';
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _maxAttendeesController,
-              decoration: const InputDecoration(
-                labelText: 'Nombre de places',
-                border: OutlineInputBorder(),
-                suffixIcon: Icon(Icons.people),
-              ),
-              keyboardType: TextInputType.number,
-              validator: (value) {
-                if (value != null && value.isEmpty) {
-                  final number = int.tryParse(value);
-                  if (number == null || number <= 0) {
-                    return 'Veuillez entrer un nombre valide';
-                  }
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 16),
-            SwitchListTile(
-              title: const Text('Événement gratuit'),
-              value: _isFree,
-              onChanged: (value) {
-                setState(() {
-                  _isFree = value;
-                });
-              },
-            ),
-            if (!_isFree) ...[
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _priceController,
-                decoration: const InputDecoration(
-                  labelText: 'Prix du billet',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.euro),
-                ),
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                validator: (value) {
-                  if (!_isFree) {
-                    if (value == null || value.isEmpty) {
-                      return 'Veuillez entrer un prix';
-                    }
-                    if (double.tryParse(value) == null) {
-                      return 'Veuillez entrer un nombre valide';
-                    }
-                  }
-                  return null;
-                },
-              ),
-            ],
-            const SizedBox(height: 24),
-            FilledButton(
-              onPressed: _createEvent,
-              child: const Text('Créer l\'événement'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+//       double? ticketPrice;
+//       String paymentType = 'free';
+//       if (!_isFree) {
+//         print('Price text before parsing: "${_priceController.text}"');
+//         final priceText = _priceController.text.trim();
+//         ticketPrice = double.tryParse(priceText);
+//         if (ticketPrice == null || ticketPrice <= 0) {
+//           ScaffoldMessenger.of(context).showSnackBar(
+//             const SnackBar(content: Text('Invalid ticket price. Please enter a valid positive number.')),
+//           );
+//           return;
+//         }
+//         paymentType = 'paid';
+//       }
 
-  void _showImageChoiceDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Choose Image Option'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.image),
-              title: const Text('Upload Image'),
-              onTap: () {
-                Navigator.pop(context);
-                _showImageSourceActionSheet();
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.auto_awesome),
-              title: const Text('Generate Image'),
-              onTap: () {
-                Navigator.pop(context);
-                // Handled in ImagePickerEventState
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+//       print('Creating event with creatorId: $creatorId, paymentType: $paymentType, ticketPrice: $ticketPrice');
+//       await _eventService.createEvent(
+//         title: _titleController.text,
+//         description: _descriptionController.text,
+//         creatorId: creatorId,
+//         startDate: startDate,
+//         location: _locationController.text,
+//         category: _selectedCategory!,
+//         paymentType: paymentType,
+//         ticketPrice: ticketPrice,
+//         maxAttendees: int.tryParse(_maxAttendeesController.text),
+//         imageUrl: _imageUrl ?? 'https://via.placeholder.com/150',
+//       );
 
-  Future<void> _pickAndUploadImage(ImageSource source) async {
-    try {
-      final XFile? image = await ImagePicker().pickImage(source: source);
-      if (image == null) return;
+//       if (mounted) {
+//         ScaffoldMessenger.of(context).showSnackBar(
+//           const SnackBar(content: Text('Event created successfully!')),
+//         );
+//         Navigator.pushReplacement(
+//           context,
+//           MaterialPageRoute(builder: (_) => const MainNavigation()),
+//         );
+//       }
+//     } catch (e) {
+//       if (mounted) {
+//         print('Failed to create event: $e');
+//         ScaffoldMessenger.of(context).showSnackBar(
+//           SnackBar(content: Text('Failed to create event: $e')),
+//         );
+//       }
+//     }
+//   }
 
-      final fileName = 'event_${DateTime.now().millisecondsSinceEpoch}.png';
-      final path = 'public/$fileName';
-      final File imageFile = File(image.path);
+//   @override
+//   Widget build(BuildContext context) {
+//     return Scaffold(
+//       appBar: AppBar(
+//         title: const Text('Créer un événement'),
+//       ),
+//       floatingActionButton: Column(
+//         mainAxisAlignment: MainAxisAlignment.end,
+//         children: [
+//           FloatingActionButton(
+//             onPressed: _showAIGeneratorDialog,
+//             child: const Icon(Icons.text_fields),
+//             heroTag: 'textGenerator',
+//           ),
+//           const SizedBox(height: 10),
+//           FloatingActionButton(
+//             onPressed: _showImageChoiceDialog,
+//             child: const Icon(Icons.image),
+//             heroTag: 'imageChoice',
+//           ),
+//         ],
+//       ),
+//       body: Form(
+//         key: _formKey,
+//         child: ListView(
+//           padding: const EdgeInsets.all(16.0),
+//           children: [
+//             ImagePickerEvent(
+//               onImageSelected: (url) => setState(() => _imageUrl = url),
+//               descriptionController: _descriptionController,
+//               promptController: _promptController,
+//             ),
+//             const SizedBox(height: 16),
+//             TextFormField(
+//               controller: _titleController,
+//               decoration: const InputDecoration(
+//                 labelText: 'Titre de l\'événement',
+//                 border: OutlineInputBorder(),
+//               ),
+//               validator: (value) {
+//                 if (value == null || value.isEmpty) {
+//                   return 'Veuillez entrer un titre';
+//                 }
+//                 return null;
+//               },
+//             ),
+//             const SizedBox(height: 16),
+//             TextFormField(
+//               controller: _descriptionController,
+//               decoration: const InputDecoration(
+//                 labelText: 'Description',
+//                 border: OutlineInputBorder(),
+//               ),
+//               maxLines: 3,
+//               validator: (value) {
+//                 if (value == null || value.isEmpty) {
+//                   return 'Veuillez entrer une description';
+//                 }
+//                 return null;
+//               },
+//             ),
+//             const SizedBox(height: 16),
+//             DropdownButtonFormField<String>(
+//               value: _selectedCategory,
+//               decoration: const InputDecoration(
+//                 labelText: 'Catégorie',
+//                 border: OutlineInputBorder(),
+//               ),
+//               items: _categories.map((String category) {
+//                 return DropdownMenuItem<String>(
+//                   value: category,
+//                   child: Text(category[0].toUpperCase() + category.substring(1)),
+//                 );
+//               }).toList(),
+//               onChanged: (String? newValue) {
+//                 setState(() {
+//                   _selectedCategory = newValue;
+//                 });
+//               },
+//               validator: (value) {
+//                 if (value == null) {
+//                   return 'Veuillez sélectionner une catégorie';
+//                 }
+//                 return null;
+//               },
+//             ),
+//             const SizedBox(height: 16),
+//             Row(
+//               children: [
+//                 Expanded(
+//                   child: TextFormField(
+//                     decoration: const InputDecoration(
+//                       labelText: 'Date',
+//                       border: OutlineInputBorder(),
+//                       suffixIcon: Icon(Icons.calendar_today),
+//                     ),
+//                     readOnly: true,
+//                     controller: TextEditingController(
+//                       text: _selectedDate != null
+//                           ? '${_selectedDate!.day}/${_selectedDate!.month}/${_selectedDate!.year}'
+//                           : '',
+//                     ),
+//                     onTap: () async {
+//                       final date = await showDatePicker(
+//                         context: context,
+//                         initialDate: DateTime.now(),
+//                         firstDate: DateTime.now(),
+//                         lastDate: DateTime.now().add(const Duration(days: 365)),
+//                       );
+//                       if (date != null) {
+//                         setState(() => _selectedDate = date);
+//                       }
+//                     },
+//                   ),
+//                 ),
+//                 const SizedBox(width: 16),
+//                 Expanded(
+//                   child: TextFormField(
+//                     decoration: const InputDecoration(
+//                       labelText: 'Heure',
+//                       border: OutlineInputBorder(),
+//                       suffixIcon: Icon(Icons.access_time),
+//                     ),
+//                     readOnly: true,
+//                     controller: TextEditingController(
+//                       text: _selectedTime != null
+//                           ? _selectedTime!.format(context)
+//                           : '',
+//                     ),
+//                     onTap: () async {
+//                       final time = await showTimePicker(
+//                         context: context,
+//                         initialTime: TimeOfDay.now(),
+//                       );
+//                       if (time != null) {
+//                         setState(() => _selectedTime = time);
+//                       }
+//                     },
+//                   ),
+//                 ),
+//               ],
+//             ),
+//             const SizedBox(height: 16),
+//             TextFormField(
+//               controller: _locationController,
+//               decoration: const InputDecoration(
+//                 labelText: 'Lieu',
+//                 border: OutlineInputBorder(),
+//                 suffixIcon: Icon(Icons.location_on),
+//               ),
+//               validator: (value) {
+//                 if (value == null || value.isEmpty) {
+//                   return 'Veuillez entrer un lieu';
+//                 }
+//                 return null;
+//               },
+//             ),
+//             const SizedBox(height: 16),
+//             TextFormField(
+//               controller: _maxAttendeesController,
+//               decoration: const InputDecoration(
+//                 labelText: 'Nombre de places',
+//                 border: OutlineInputBorder(),
+//                 suffixIcon: Icon(Icons.people),
+//               ),
+//               keyboardType: TextInputType.number,
+//               validator: (value) {
+//                 if (value != null && value.isEmpty) {
+//                   final number = int.tryParse(value);
+//                   if (number == null || number <= 0) {
+//                     return 'Veuillez entrer un nombre valide';
+//                   }
+//                 }
+//                 return null;
+//               },
+//             ),
+//             const SizedBox(height: 16),
+//             SwitchListTile(
+//               title: const Text('Événement gratuit'),
+//               value: _isFree,
+//               onChanged: (value) {
+//                 setState(() {
+//                   _isFree = value;
+//                 });
+//               },
+//             ),
+//             if (!_isFree) ...[
+//               const SizedBox(height: 16),
+//               TextFormField(
+//                 controller: _priceController,
+//                 decoration: const InputDecoration(
+//                   labelText: 'Prix du billet',
+//                   border: OutlineInputBorder(),
+//                   prefixIcon: Icon(Icons.euro),
+//                 ),
+//                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
+//                 validator: (value) {
+//                   if (!_isFree) {
+//                     if (value == null || value.isEmpty) {
+//                       return 'Veuillez entrer un prix';
+//                     }
+//                     if (double.tryParse(value) == null) {
+//                       return 'Veuillez entrer un nombre valide';
+//                     }
+//                   }
+//                   return null;
+//                 },
+//               ),
+//             ],
+//             const SizedBox(height: 24),
+//             FilledButton(
+//               onPressed: _createEvent,
+//               child: const Text('Créer l\'événement'),
+//             ),
+//           ],
+//         ),
+//       ),
+//     );
+//   }
 
-      await SupabaseConfig.client.storage.from('eventimages').upload(path, imageFile);
-      final imageUrl = SupabaseConfig.client.storage.from('eventimages').getPublicUrl(path);
-      setState(() => _imageUrl = imageUrl);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Image uploaded successfully')),
-      );
-    } catch (e) {
-      print('Error picking/uploading image: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to pick or upload image.')),
-      );
-    }
-  }
+//   void _showImageChoiceDialog() {
+//     showDialog(
+//       context: context,
+//       builder: (context) => AlertDialog(
+//         title: const Text('Choose Image Option'),
+//         content: Column(
+//           mainAxisSize: MainAxisSize.min,
+//           children: [
+//             ListTile(
+//               leading: const Icon(Icons.image),
+//               title: const Text('Upload Image'),
+//               onTap: () {
+//                 Navigator.pop(context);
+//                 _showImageSourceActionSheet();
+//               },
+//             ),
+//             ListTile(
+//               leading: const Icon(Icons.auto_awesome),
+//               title: const Text('Generate Image'),
+//               onTap: () {
+//                 Navigator.pop(context);
+//                 // Handled in ImagePickerEventState
+//               },
+//             ),
+//           ],
+//         ),
+//       ),
+//     );
+//   }
 
-  void _showImageSourceActionSheet() {
-    showModalBottomSheet(
-      context: context,
-      builder: (_) => SafeArea(
-        child: Wrap(
-          children: [
-            ListTile(
-              leading: const Icon(Icons.photo_library),
-              title: const Text('Gallery'),
-              onTap: () {
-                Navigator.of(context).pop();
-                _pickAndUploadImage(ImageSource.gallery);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.camera_alt),
-              title: const Text('Camera'),
-              onTap: () {
-                Navigator.of(context).pop();
-                _pickAndUploadImage(ImageSource.camera);
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
+//   Future<void> _pickAndUploadImage(ImageSource source) async {
+//     try {
+//       final XFile? image = await ImagePicker().pickImage(source: source);
+//       if (image == null) return;
+
+//       final fileName = 'event_${DateTime.now().millisecondsSinceEpoch}.png';
+//       final path = 'public/$fileName';
+//       final File imageFile = File(image.path);
+
+//       await SupabaseConfig.client.storage.from('eventimages').upload(path, imageFile);
+//       final imageUrl = SupabaseConfig.client.storage.from('eventimages').getPublicUrl(path);
+//       setState(() => _imageUrl = imageUrl);
+//       ScaffoldMessenger.of(context).showSnackBar(
+//         const SnackBar(content: Text('Image uploaded successfully')),
+//       );
+//     } catch (e) {
+//       print('Error picking/uploading image: $e');
+//       ScaffoldMessenger.of(context).showSnackBar(
+//         const SnackBar(content: Text('Failed to pick or upload image.')),
+//       );
+//     }
+//   }
+
+//   void _showImageSourceActionSheet() {
+//     showModalBottomSheet(
+//       context: context,
+//       builder: (_) => SafeArea(
+//         child: Wrap(
+//           children: [
+//             ListTile(
+//               leading: const Icon(Icons.photo_library),
+//               title: const Text('Gallery'),
+//               onTap: () {
+//                 Navigator.of(context).pop();
+//                 _pickAndUploadImage(ImageSource.gallery);
+//               },
+//             ),
+//             ListTile(
+//               leading: const Icon(Icons.camera_alt),
+//               title: const Text('Camera'),
+//               onTap: () {
+//                 Navigator.of(context).pop();
+//                 _pickAndUploadImage(ImageSource.camera);
+//               },
+//             ),
+//           ],
+//         ),
+//       ),
+//     );
+//   }
+// }
+
