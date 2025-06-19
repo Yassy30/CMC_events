@@ -6,7 +6,7 @@ import 'package:cmc_ev/models/user.dart' as my_models;
 class EditProfileScreen extends StatefulWidget {
   final my_models.User user;
   final Function(String, String, File?) onUpdate;
-
+  
   const EditProfileScreen({
     super.key,
     required this.user,
@@ -31,6 +31,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> with SingleTicker
     _usernameController = TextEditingController(text: widget.user.username);
     _bioController = TextEditingController(text: widget.user.bio ?? '');
     _image = null;
+    
     _animationController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 800),
@@ -58,20 +59,24 @@ class _EditProfileScreenState extends State<EditProfileScreen> with SingleTicker
       );
       return;
     }
+
     setState(() {
       _isLoading = true;
     });
+
     try {
       final imageUploadSuccess = await widget.onUpdate(
         _usernameController.text,
         _bioController.text,
         _image,
       );
+
       if (mounted) {
         String message = 'Profil mis à jour avec succès';
         if (!imageUploadSuccess && _image != null) {
           message = 'Nom d\'utilisateur et bio mis à jour, mais échec du téléchargement de l\'image';
         }
+        
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(message),
@@ -89,6 +94,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> with SingleTicker
         if (e.toString().contains('bucket')) {
           errorMessage = 'Problème avec le stockage des images. Veuillez contacter l\'administrateur.';
         }
+        
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(errorMessage),
@@ -111,113 +117,133 @@ class _EditProfileScreenState extends State<EditProfileScreen> with SingleTicker
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Theme.of(context).colorScheme.primary.withOpacity(0.1),
-              Theme.of(context).colorScheme.secondary.withOpacity(0.1),
-            ],
+      appBar: AppBar(
+        title: Text(
+          'Modifier le Profil',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 22,
+            color: Theme.of(context).colorScheme.primary,
           ),
         ),
-        child: SafeArea(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        centerTitle: true,
+        leading: IconButton(
+          onPressed: () => Navigator.of(context).pop(),
+          icon: Icon(
+            Icons.arrow_back_ios_new,
+            color: Theme.of(context).colorScheme.primary,
+          ),
+        ),
+      ),
+      body: Container(
+        width: double.infinity,
+        height: double.infinity,
+        color: Colors.grey[50],
+        child: FadeTransition(
+          opacity: _fadeAnimation,
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 32.0),
-            child: FadeTransition(
-              opacity: _fadeAnimation,
-              child: Card(
-                elevation: 8,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(24.0),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              children: [
+                const SizedBox(height: 20),
+                
+                // Profile Picture
+                GestureDetector(
+                  onTap: _isLoading ? null : _pickImage,
+                  child: Stack(
                     children: [
-                      Text(
-                        'Modifier le Profil',
-                        style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color: Theme.of(context).colorScheme.primary,
-                            ),
+                      CircleAvatar(
+                        radius: 60,
+                        backgroundColor: Colors.grey[300],
+                        backgroundImage: _image != null
+                            ? FileImage(_image!)
+                            : (widget.user.profilePicture != null
+                                ? NetworkImage(widget.user.profilePicture!)
+                                : null) as ImageProvider<Object>?,
+                        child: _image == null && widget.user.profilePicture == null
+                            ? const Icon(Icons.person, size: 60, color: Colors.grey)
+                            : null,
                       ),
-                      const SizedBox(height: 24),
-                      GestureDetector(
-                        onTap: _isLoading ? null : _pickImage,
-                        child: CircleAvatar(
-                          radius: 50,
-                          backgroundImage: _image != null
-                              ? FileImage(_image!)
-                              : (widget.user.profilePicture != null
-                                  ? NetworkImage(widget.user.profilePicture!)
-                                  : null) as ImageProvider<Object>?,
-                          child: _image == null && widget.user.profilePicture == null
-                              ? const Icon(Icons.person, size: 50, color: Colors.grey)
-                              : null,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'Changer la photo de profil',
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.primary,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      _buildTextField(
-                        controller: _usernameController,
-                        label: 'Nom d\'utilisateur',
-                        icon: Icons.person,
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Veuillez entrer un nom d\'utilisateur';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 16),
-                      _buildTextField(
-                        controller: _bioController,
-                        label: 'Bio',
-                        icon: Icons.info,
-                        maxLines: 3,
-                      ),
-                      const SizedBox(height: 32),
-                      ElevatedButton(
-                        onPressed: _isLoading ? null : _saveProfile,
-                        style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                      Positioned(
+                        bottom: 0,
+                        right: 0,
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).colorScheme.primary,
+                            shape: BoxShape.circle,
                           ),
-                          backgroundColor: Theme.of(context).colorScheme.primary,
-                          foregroundColor: Colors.white,
-                          elevation: 4,
+                          child: const Icon(
+                            Icons.camera_alt,
+                            color: Colors.white,
+                            size: 20,
+                          ),
                         ),
-                        child: _isLoading
-                            ? const SizedBox(
-                                width: 24,
-                                height: 24,
-                                child: CircularProgressIndicator(
-                                  color: Colors.white,
-                                ),
-                              )
-                            : const Text(
-                                'Enregistrer',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
                       ),
                     ],
                   ),
                 ),
-              ),
+                
+                const SizedBox(height: 10),
+                Text(
+                  'Changer la photo de profil',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.primary,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                
+                const SizedBox(height: 40),
+                
+                // Username Field
+                _buildTextField(
+                  controller: _usernameController,
+                  label: 'Nom d\'utilisateur',
+                  icon: Icons.person,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Veuillez entrer un nom d\'utilisateur';
+                    }
+                    return null;
+                  },
+                ),
+                
+                const SizedBox(height: 20),
+                
+                // Bio Field
+                _buildTextField(
+                  controller: _bioController,
+                  label: 'Bio',
+                  icon: Icons.info,
+                  maxLines: 3,
+                ),
+                
+                const SizedBox(height: 40),
+                
+                // Save Button
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: ElevatedButton(
+                    onPressed: _isLoading ? null : _saveProfile,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Theme.of(context).colorScheme.primary,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    child: _isLoading
+                        ? const CircularProgressIndicator(color: Colors.white)
+                        : const Text(
+                            'Enregistrer',
+                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                          ),
+                  ),
+                ),
+              ],
             ),
           ),
         ),
@@ -236,21 +262,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> with SingleTicker
       controller: controller,
       decoration: InputDecoration(
         labelText: label,
-        prefixIcon: Icon(icon, color: Theme.of(context).colorScheme.primary),
+        prefixIcon: Icon(icon),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide.none,
+          borderRadius: BorderRadius.circular(10),
         ),
         filled: true,
-        fillColor: Colors.grey[100],
-        contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(
-            color: Theme.of(context).colorScheme.primary,
-            width: 2,
-          ),
-        ),
+        fillColor: Colors.white,
       ),
       maxLines: maxLines,
       validator: validator,
