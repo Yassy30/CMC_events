@@ -34,15 +34,18 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   String? _selectedCategory;
   final _eventService = EventService();
 
-  final List<String> _categories = [
-    'All Events',
-    'Art & Design',
-    'Sports',
-    'Gaming',
-    'Music',
-    'Tech',
-    'Other'
-  ];
+final Map<String, String> _categories = {
+  'culture': 'Art & Design',
+  'sport': 'Sports',
+  'competition': 'Gaming',
+  'music': 'Music',
+  'tech': 'Tech',
+  'other': 'Other',
+};
+
+String _formatCategoryDisplay(String category) {
+  return _categories[category] ?? (category[0].toUpperCase() + category.substring(1));
+}
 
   @override
   void initState() {
@@ -234,13 +237,13 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
       }
 
       print('Creating event with creatorId: $creatorId, paymentType: $paymentType, ticketPrice: $ticketPrice');
-      await _eventService.createEvent(
+
+  await _eventService.createEvent(
         title: _titleController.text,
         description: _descriptionController.text,
-        creatorId: creatorId,
         startDate: startDate,
         location: _locationController.text,
-        category: _mapDisplayCategoryToDatabase(_selectedCategory!),
+        category: _selectedCategory!,
         paymentType: paymentType,
         ticketPrice: ticketPrice,
         maxAttendees: int.tryParse(_maxAttendeesController.text),
@@ -334,12 +337,12 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                 labelText: 'Catégorie',
                 border: OutlineInputBorder(),
               ),
-              items: _categories.map((String category) {
-                return DropdownMenuItem<String>(
-                  value: category,
-                  child: Text(category[0].toUpperCase() + category.substring(1)),
-                );
-              }).toList(),
+items: _categories.entries.map((entry) {
+  return DropdownMenuItem<String>(
+    value: entry.key, // Raw enum value (e.g., 'sport')
+    child: Text(entry.value), // Display name (e.g., 'Sports')
+  );
+}).toList(),
               onChanged: (String? newValue) {
                 setState(() {
                   _selectedCategory = newValue;
