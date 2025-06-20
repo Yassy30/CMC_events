@@ -158,4 +158,54 @@ class ProfileService {
       return false;
     }
   }
+
+  Future<bool> isFollowing(String followerId, String followedId) async {
+    try {
+      final response = await _supabase
+          .from('follows')
+          .select()
+          .eq('follower_id', followerId)
+          .eq('followed_id', followedId);
+      return response.isNotEmpty;
+    } catch (e) {
+      print('Error checking follow status: $e');
+      return false;
+    }
+  }
+
+  Future<void> toggleSaveEvent(String eventId, String userId) async {
+    try {
+      final isSaved = await isEventSaved(eventId, userId);
+      if (isSaved) {
+        await _supabase
+            .from('saved_events')
+            .delete()
+            .eq('event_id', eventId)
+            .eq('user_id', userId);
+      } else {
+        await _supabase.from('saved_events').insert({
+          'event_id': eventId,
+          'user_id': userId,
+          'created_at': DateTime.now().toIso8601String(),
+        });
+      }
+    } catch (e) {
+      print('Error toggling save event: $e');
+      rethrow;
+    }
+  }
+
+  Future<bool> isEventSaved(String eventId, String userId) async {
+    try {
+      final response = await _supabase
+          .from('saved_events')
+          .select()
+          .eq('event_id', eventId)
+          .eq('user_id', userId);
+      return response.isNotEmpty;
+    } catch (e) {
+      print('Error checking save status: $e');
+      return false;
+    }
+  }
 }

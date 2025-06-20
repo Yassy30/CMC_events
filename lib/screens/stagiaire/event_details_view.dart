@@ -6,11 +6,12 @@ import '../../services/auth_service.dart';
 import '../../services/like_service.dart';
 import '../../services/comment_service.dart';
 import '../../models/comment.dart';
+import '../../services/profile_service.dart'; // Add this import if ProfileService exists
 
 class EventDetailsView extends StatefulWidget {
   final Event event;
   final ScrollController controller;
- 
+
   const EventDetailsView({
     super.key,
     required this.event,
@@ -32,14 +33,16 @@ class _EventDetailsViewState extends State<EventDetailsView> {
   bool _isLiked = false;
   int _likesCount = 0;
   int _commentsCount = 0;
-
+  final _profileService = ProfileService(); // Add ProfileService
+  bool _isFollowing = false; // Track follow status
+  bool _isSaved = false; // Track save status
   @override
   void initState() {
     super.initState();
     _loadData();
   }
 
-  Future<void> _loadData() async {
+Future<void> _loadData() async {
     try {
       final reservationsCount = await _eventService.getReservationsCount(widget.event.id);
       final likesCount = await _likeService.getLikesCount(widget.event.id);
@@ -47,13 +50,21 @@ class _EventDetailsViewState extends State<EventDetailsView> {
       final isLiked = _authService.isLoggedIn 
           ? await _likeService.isEventLikedByUser(widget.event.id, _authService.currentUserId)
           : false;
-      
+      final isFollowing = _authService.isLoggedIn 
+          ? await _profileService.isFollowing(_authService.currentUserId, widget.event.creatorId)
+          : false;
+      final isSaved = _authService.isLoggedIn 
+          ? await _profileService.isEventSaved(widget.event.id, _authService.currentUserId)
+          : false;
+
       if (mounted) {
         setState(() {
           _reservationsCount = reservationsCount;
           _likesCount = likesCount;
           _commentsCount = commentsCount;
           _isLiked = isLiked;
+          _isFollowing = isFollowing;
+          _isSaved = isSaved;
           _isLoading = false;
         });
       }
@@ -64,6 +75,35 @@ class _EventDetailsViewState extends State<EventDetailsView> {
           _isLoading = false;
         });
       }
+    }
+  }
+
+Future<void> _toggleSave() async {
+    if (!_authService.isLoggedIn) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please log in to save events')),
+      );
+      return;
+    }
+
+    try {
+      final userId = _authService.currentUserId;
+      final wasSaved = _isSaved;
+      
+      await _profileService.toggleSaveEvent(widget.event.id, userId);
+      
+      if (mounted) {
+        setState(() {
+          _isSaved = !_isSaved;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(_isSaved ? ' Ascendant' : 'Event removed from favorites')),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: ${e.toString()}')),
+      );
     }
   }
 
@@ -99,6 +139,32 @@ class _EventDetailsViewState extends State<EventDetailsView> {
     }
   }
 
+Future<void> _toggleFollow() async {
+    if (!_authService.isLoggedIn) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please log in to follow organizers')),
+      );
+      return;
+    }
+
+    try {
+      final userId = _authService.currentUserId;
+      await _profileService.followUser(userId, widget.event.creatorId, !_isFollowing);
+      
+      if (mounted) {
+        setState(() {
+          _isFollowing = !_isFollowing;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(_isFollowing ? 'Now following organizer' : 'Unfollowed organizer')),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: ${e.toString()}')),
+      );
+    }
+  }
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -338,69 +404,68 @@ class _EventDetailsViewState extends State<EventDetailsView> {
                     const SizedBox(height: 12),
                     
                     // Organizer card
-                    Card(
-                      elevation: 0,
-                      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        side: BorderSide(color: Colors.grey[200]!),
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Row(
-                          children: [
-                            CircleAvatar(
-                              radius: 24,
-                              backgroundImage: NetworkImage(
-                                widget.event.creatorImageUrl ?? 'https://via.placeholder.com/100',
-                              ),
-                              backgroundColor: Colors.grey[200],
+                    // In the build method, replace the OutlinedButton in the Organizer Card
+                  Card(
+                    elevation: 0,
+                    margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      side: BorderSide(color: Colors.grey[200]!),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Row(
+                        children: [
+                          CircleAvatar(
+                            radius: 24,
+                            backgroundImage: NetworkImage(
+                              widget.event.creatorImageUrl ?? 'https://via.placeholder.com/100',
                             ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Organized by',
-                                    style: TextStyle(
-                                      color: Colors.grey[600],
-                                      fontSize: 12,
-                                    ),
+                            backgroundColor: Colors.grey[200],
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Organized by',
+                                  style: TextStyle(
+                                    color: Colors.grey[600],
+                                    fontSize: 12,
                                   ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    widget.event.creatorName ?? 'Event Organizer',
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 14,
-                                    ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  widget.event.creatorName ?? 'Event Organizer',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14,
                                   ),
-                                ],
+                                ),
+                              ],
+                            ),
+                          ),
+                          OutlinedButton(
+                            onPressed: _toggleFollow,
+                            style: OutlinedButton.styleFrom(
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              side: BorderSide(color: theme.colorScheme.primary),
+                            ),
+                            child: Text(
+                              _isFollowing ? 'Unfollow' : 'Follow',
+                              style: TextStyle(
+                                color: theme.colorScheme.primary,
+                                fontSize: 12,
                               ),
                             ),
-                            OutlinedButton(
-                              onPressed: () {
-                                // Navigate to organizer profile
-                              },
-                              style: OutlinedButton.styleFrom(
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                side: BorderSide(color: theme.colorScheme.primary),
-                              ),
-                              child: Text(
-                                'Follow',
-                                style: TextStyle(
-                                  color: theme.colorScheme.primary,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
                     ),
+                  ),
                     
                     const SizedBox(height: 12),
                     
@@ -588,19 +653,14 @@ class _EventDetailsViewState extends State<EventDetailsView> {
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       child: OutlinedButton.icon(
-                        onPressed: () {
-                          // Save logic will go here
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Event saved to favorites')),
-                          );
-                        },
+                        onPressed: _toggleSave,
                         icon: Icon(
-                          Icons.bookmark_border,
+                          _isSaved ? Icons.bookmark : Icons.bookmark_border,
                           color: Theme.of(context).colorScheme.primary,
                           size: 18,
                         ),
                         label: Text(
-                          'Save',
+                          _isSaved ? 'Saved' : 'Save',
                           style: TextStyle(
                             color: Theme.of(context).colorScheme.primary,
                             fontSize: 10
