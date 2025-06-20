@@ -2,9 +2,14 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:cmc_ev/models/user.dart' as my_user;
 import 'dart:math';
 import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 class AuthService {
   final SupabaseClient _supabase = Supabase.instance.client;
+ User? get currentUser => _supabase.auth.currentUser;
+  String get currentUserId => currentUser?.id ?? '';
+  bool get isLoggedIn => currentUser != null;
+    Stream<AuthState> get authStateChanges => _supabase.auth.onAuthStateChange;
 
   Future<AuthResponse?> signUp(String email, String password, String username, {String role = 'stagiaire'}) async {
     try {
@@ -100,7 +105,10 @@ class AuthService {
   }
 
   // NEW: Send OTP for password reset
- Future<void> sendPasswordResetOTP(String email) async {
+// Add this method to your AuthService class
+// Replace the existing sendPasswordResetOTP method with this:
+
+Future<void> sendPasswordResetEmail(String email) async {
   try {
     // Check if user exists
     final userExists = await _supabase
@@ -113,8 +121,11 @@ class AuthService {
       throw Exception('No account found with this email address');
     }
 
-    // Trigger Supabase Auth's password reset email
-    await _supabase.auth.resetPasswordForEmail(email, redirectTo: 'yourapp://reset-password');
+    // Send password reset email using Supabase Auth
+    await _supabase.auth.resetPasswordForEmail(
+      email,
+      redirectTo: 'yourapp://reset-password', // Replace with your app's deep link
+    );
 
     print('Password reset email sent to: $email');
   } catch (e) {
@@ -122,7 +133,6 @@ class AuthService {
     rethrow;
   }
 }
- 
  
   // NEW: Verify OTP
   Future<bool> verifyPasswordResetOTP(String email, String enteredOTP) async {
@@ -199,20 +209,72 @@ Future<void> resetPasswordWithOTP(String email, String newPassword) async {
   }
 }
 
-  // Helper method to send OTP email
-  Future<void> _sendOTPEmail(String email, String otp) async {
-    // This is a placeholder - you'll need to implement actual email sending
-    // Options:
-    // 1. Supabase Edge Functions with Resend/SendGrid
-    // 2. Firebase Functions
-    // 3. Your own backend API
+// Implement actual email sending
+Future<void> _sendOTPEmail(String email, String otp) async {
+  try {
+    // Example using http package to call your email service
+    // You need to implement your own email service endpoint
     
-    print('📧 Sending OTP email to $email: $otp');
-    
-    // For now, we'll simulate email sending
-    // In production, integrate with email service
-  }
+    final response = await http.post(
+      Uri.parse('YOUR_EMAIL_SERVICE_ENDPOINT'), // Replace with your endpoint
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer YOUR_API_KEY', // Your email service API key
+      },
+      body: jsonEncode({
+        'to': email,
+        'subject': 'Password Reset Code',
+        'html': '''
+          <h2>Password Reset</h2>
+          <p>Your password reset code is: <strong>$otp</strong></p>
+          <p>This code will expire in 3 minutes.</p>
+        ''',
+      }),
+    );
 
+    if (response.statusCode != 200) {
+      throw Exception('Failed to send email: ${response.body}');
+    }
+    
+    print('OTP email sent successfully to $email');
+  } catch (e) {
+    print('Email sending error: $e');
+    throw Exception('Failed to send verification email. Please try again.');
+  }
+}
+Future<void> sendPasswordResetOTP(String email) async {
+  try {
+    // Check if user exists
+    final userExists = await _supabase
+        .from('users')
+        .select('id')
+        .eq('email', email)
+        .maybeSingle();
+    
+    if (userExists == null) {
+      throw Exception('No account found with this email address');
+    }
+
+    // Generate OTP
+    final otp = _generateOTP();
+    
+    // Store OTP in database
+    await _supabase.from('password_reset_otps').insert({
+      'email': email,
+      'otp': otp,
+      'expires_at': DateTime.now().add(const Duration(minutes: 3)).toIso8601String(),
+      'used': false,
+    });
+
+    // Send OTP via email
+    await _sendOTPEmail(email, otp);
+
+    print('Password reset OTP sent to: $email');
+  } catch (e) {
+    print('Send password reset OTP error: $e');
+    rethrow;
+  }
+}
   Future<void> signOut() async {
     await _supabase.auth.signOut();
     print('Signed out');
@@ -244,5 +306,5 @@ Future<void> resetPasswordWithOTP(String email, String newPassword) async {
     }
   }
 
-  Stream<AuthState> get authStateChanges => _supabase.auth.onAuthStateChange;
+  
 }

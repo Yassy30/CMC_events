@@ -11,7 +11,7 @@ import 'package:cmc_ev/screens/stagiaire/profil/share_profil.dart';
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
   
-  @override
+  @override 
   _ProfileScreenState createState() => _ProfileScreenState();
 }
 

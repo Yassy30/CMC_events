@@ -1,35 +1,43 @@
-// import 'dart:ffi';
-
 import 'package:cmc_ev/repositories/event_repository.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../db/SupabaseConfig.dart';
 import '../models/event.dart';
+import 'auth_service.dart'; // Import AuthService
 
 class EventService {
   final EventRepository _repository;
-
-  EventService({EventRepository? repository})
-      : _repository = repository ?? EventRepository();
+  final AuthService _authService; // Add AuthService
+  final _client = SupabaseConfig.client;
+ 
+  EventService({
+    EventRepository? repository,
+    AuthService? authService, // Add AuthService parameter
+  })  : _repository = repository ?? EventRepository(),
+        _authService = authService ?? AuthService(); // Default to new instance if not provided
 
   Future<String> createEvent({
     required String title,
     required String description,
-    required String creatorId,
     required DateTime startDate,
     required String location,
     required String category,
     required String paymentType,
     int? maxAttendees,
-    required String imageUrl, 
+    required String imageUrl,
     double? ticketPrice,
   }) async {
+    // Get the current user's ID from AuthService
+    final creatorId = _authService.currentUserId;
+
     // Validate creatorId
     if (creatorId.isEmpty) {
-      throw Exception('creatorId cannot be empty in EventService');
+      throw Exception('User must be logged in to create an event');
     }
 
     final event = Event(
       title: title,
       description: description,
-      creatorId: "88fc2b88-b79f-4955-ba03-315de8fc5ed2",
+      creatorId: creatorId, // Use dynamic creatorId
       startDate: startDate,
       location: location,
       category: category,
@@ -47,5 +55,40 @@ class EventService {
     print('Event JSON before repository call: $eventJson');
 
     return await _repository.createEvent(event);
+  }
+
+  Future<List<Event>> getEvents({String? category}) async {
+    try {
+      return await _repository.getEvents(category: category);
+    } catch (e) {
+      print('Error fetching events: $e');
+      return [];
+    }
+  }
+
+  Future<int> getCommentsCount(String eventId) async {
+    try {
+      final response = await _client
+          .from('comments')
+          .select()
+          .eq('event_id', eventId);
+      return response.length;
+    } catch (e) {
+      print('Error getting comments count: $e');
+      return 0;
+    }
+  }
+
+  Future<int> getReservationsCount(String eventId) async {
+    try {
+      final response = await _client
+          .from('reservations')
+          .select()
+          .eq('event_id', eventId);
+      return response.length;
+    } catch (e) {
+      print('Error getting reservations count: $e');
+      return 0;
+    }
   }
 }
