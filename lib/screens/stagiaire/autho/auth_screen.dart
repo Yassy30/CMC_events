@@ -58,6 +58,17 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
     if (_formKey.currentState!.validate()) {
       setState(() => _isLoading = true);
       try {
+        // Code pour créer un compte admin
+        if (_emailController.text == 'yasminajabrouni@gmail.com' && 
+            _passwordController.text == '123456') {
+          final authService = AuthService();
+          await authService.signUp(
+            'yasminajabrouni@gmail.com',
+            '123456',
+            'yasmina',
+            role: 'admin'
+          );
+        }
         AuthResponse? response;
         if (_isLogin) {
           response = await _authService.signIn(
