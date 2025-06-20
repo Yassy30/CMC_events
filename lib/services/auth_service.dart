@@ -40,7 +40,38 @@ class AuthService {
           print('Insert error: $insertError');
           rethrow;
         }
+        try {
+          final insertResponse = await _supabase.from('users').insert({
+            'id': response.user!.id,
+            'email': email,
+            'username': username,
+            'role': role,
+            'created_at': DateTime.now().toIso8601String(),
+          });
+          print('Insert response: $insertResponse');
+        } catch (insertError) {
+          print('Insert error: $insertError');
+          rethrow;
+        }
 
+        print('User inserted: id=${response.user!.id}');
+        if (response.session != null) {
+          await _supabase.auth.setSession(response.session!.refreshToken!);
+          print('Session set: user=${response.user!.id}');
+        }
+        return response;
+      }
+      print('Sign-up failed: No user returned');
+      return null;
+    } catch (e) {
+      if (e.toString().contains('over_email_send_rate_limit')) {
+        print('Sign-up error: Email send rate limit exceeded. Please wait 42 seconds and try again.');
+        rethrow;
+      }
+      print('Sign-up error: $e');
+      rethrow;
+    }
+  }
         print('User inserted: id=${response.user!.id}');
         if (response.session != null) {
           await _supabase.auth.setSession(response.session!.refreshToken!);
@@ -67,7 +98,27 @@ class AuthService {
         password: password,
       );
       print('Sign-in successful: id=${response.user?.id}');
+  Future<AuthResponse?> signIn(String email, String password) async {
+    try {
+      final response = await _supabase.auth.signInWithPassword(
+        email: email,
+        password: password,
+      );
+      print('Sign-in successful: id=${response.user?.id}');
 
+      // Check if user exists in users table, if not, insert
+      final user = await getUserFromTable(response.user!.id);
+      if (user == null) {
+        print('User not found in users table, creating...');
+        await _supabase.from('users').insert({
+          'id': response.user!.id,
+          'email': email,
+          'username': response.user!.userMetadata?['username'] ?? 'default_user',
+          'role': response.user!.userMetadata?['role'] ?? 'stagiaire',
+          'created_at': DateTime.now().toIso8601String(),
+        });
+        print('User created in users table: id=${response.user!.id}');
+      }
       // Check if user exists in users table, if not, insert
       final user = await getUserFromTable(response.user!.id);
       if (user == null) {
@@ -243,6 +294,4 @@ Future<void> resetPasswordWithOTP(String email, String newPassword) async {
       return null;
     }
   }
-
-  Stream<AuthState> get authStateChanges => _supabase.auth.onAuthStateChange;
 }

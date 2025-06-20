@@ -1,0 +1,2 @@
+C:/Users/FATIMA ZAHRA/CMC_events/android/app/.cxx/Debug/o21672l3/x86_64/CMakeFiles/edit_cache.dir
+C:/Users/FATIMA ZAHRA/CMC_events/android/app/.cxx/Debug/o21672l3/x86_64/CMakeFiles/rebuild_cache.dir
