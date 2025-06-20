@@ -122,6 +122,8 @@ class AuthService {
     rethrow;
   }
 }
+ 
+ 
   // NEW: Verify OTP
   Future<bool> verifyPasswordResetOTP(String email, String enteredOTP) async {
     try {
@@ -163,6 +165,7 @@ class AuthService {
       rethrow;
     }
   }
+
 // NEW: Update user's password
   Future<void> updatePassword(String newPassword) async {
     try {
@@ -183,6 +186,7 @@ class AuthService {
       rethrow;
     }
   }
+
   // NEW: Reset password after OTP verification
 Future<void> resetPasswordWithOTP(String email, String newPassword) async {
   try {
