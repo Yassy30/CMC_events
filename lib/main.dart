@@ -20,9 +20,7 @@ void main() async {
   await SupabaseConfig.initialize();
 
   runApp(const MyApp());
-  print("Supabase initialized successfully");
-  // You can now use SupabaseConfig.client to access the Supabase client
-  
+  print("Supabase initialized successfully");  
 }
 
 class MyApp extends StatelessWidget {
