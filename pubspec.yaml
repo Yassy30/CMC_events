@@ -50,6 +50,7 @@ dev_dependencies:
   url_launcher: ^6.2.5
   http: ^1.2.2
   image_picker: ^1.1.2
+  qr_flutter: ^4.1.0  # For QR code generation
   path_provider: ^2.1.1
 
   # The "flutter_lints" package below contains a set of recommended lints to

@@ -3,6 +3,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:cmc_ev/services/auth_service.dart';
 import 'package:cmc_ev/screens/stagiaire/provider/user_provider.dart';
 import 'package:provider/provider.dart';
+// Import the forgot password dialog
+import 'package:cmc_ev/screens/stagiaire/autho/forget_password_dialog.dart'; // Add this import
 
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key});
@@ -108,6 +110,14 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
     }
   }
 
+  // NEW: Method to show forgot password dialog
+  void _showForgotPasswordDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => const ForgotPasswordDialog(),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -136,7 +146,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
                         const SizedBox(height: 20),
                         Text(
                           _isLogin ? 'Back for More?' : 'Join the Fun!',
-                          style: TextStyle(
+                          style: const TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.w600,
                             color: Colors.black87,
@@ -224,7 +234,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
                                 Align(
                                   alignment: Alignment.centerRight,
                                   child: TextButton(
-                                    onPressed: () {},
+                                    onPressed: _showForgotPasswordDialog, // UPDATED: Now calls the dialog
                                     child: const Text('Forget password?'),
                                   ),
                                 ),
@@ -288,7 +298,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
                                   });
                                 },
                                 child: Text(
-                                  _isLogin ? 'You Don\'t have account?Sign Up' : 'Already have an account? Log In',
+                                  _isLogin ? 'You Don\'t have account? Sign Up' : 'Already have an account? Log In',
                                   style: TextStyle(
                                     color: Colors.teal[400],
                                     fontWeight: FontWeight.w600,
