@@ -5,7 +5,7 @@ import 'package:cmc_ev/models/user.dart' as local_user;
 class ProfileService {
   final SupabaseClient _supabase = Supabase.instance.client;
   static const String _bucketName = 'profile-pictures'; // Updated to match existing bucket
-
+ 
   // Fetch user profile
   Future<local_user.User?> getUserProfile(String userId) async {
     try {

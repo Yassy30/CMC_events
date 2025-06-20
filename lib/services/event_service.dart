@@ -8,7 +8,7 @@ class EventService {
   final EventRepository _repository;
   final AuthService _authService; // Add AuthService
   final _client = SupabaseConfig.client;
-
+ 
   EventService({
     EventRepository? repository,
     AuthService? authService, // Add AuthService parameter
