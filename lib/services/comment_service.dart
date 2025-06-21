@@ -62,4 +62,18 @@ class CommentService {
       return null;
     }
   }
+
+  Future<int> getCommentsCount(String eventId) async {
+    try {
+      final response = await SupabaseConfig.client
+          .from('comments')
+          .select()
+          .eq('event_id', eventId);
+
+      return response.length;
+    } catch (e) {
+      print('Error getting comments count: $e');
+      return 0;
+    }
+  }
 }

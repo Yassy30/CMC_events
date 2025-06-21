@@ -75,19 +75,123 @@ class EventService {
     }
   }
 
+
+  // Update getReservationsCount to count both completed and pending reservations
   Future<int> getReservationsCount(String eventId) async {
     try {
-      // Use simple select and count the response length
+      // Get all reservations for this event
       final response = await _client
           .from('reservations')
-          .select()
+          .select('payment_status')
           .eq('event_id', eventId);
-      
-      // Count manually
+    
+      print('Found ${response.length} reservations for event $eventId');
+    
+      // Count all reservations (both pending and completed)
+      // For display purposes we want to show all reserved spots
       return response.length;
     } catch (e) {
       print('Error getting reservations count: $e');
       return 0;
+    }
+  }
+
+  // Add method to check if user is registered for an event
+  Future<bool> isUserRegistered(String eventId, String userId) async {
+    try {
+      final response = await _client
+          .from('reservations')
+          .select()
+          .eq('event_id', eventId)
+          .eq('user_id', userId)
+          .limit(1);
+      
+      return response.isNotEmpty;
+    } catch (e) {
+      print('Error checking if user is registered: $e');
+      return false;
+    }
+  }
+
+  // Add method to register a user for an event
+  Future<bool> registerForEvent(String eventId, String userId) async {
+    try {
+      // Check if user is already registered
+      final existingRegistration = await _client
+          .from('reservations')
+          .select()
+          .eq('event_id', eventId)
+          .eq('user_id', userId)
+          .limit(1);
+    
+      if (existingRegistration.isNotEmpty) {
+        return false; // User already registered
+      }
+    
+      // First check if there are spots available
+      final event = await _client
+          .from('events')
+          .select()
+          .eq('id', eventId)
+          .single();
+    
+      final reservations = await getReservationsCount(eventId);
+    
+      // Check if the event has a max attendee limit and if it's reached
+      if (event['max_attendees'] != null && 
+          reservations >= event['max_attendees']) {
+        throw Exception('Event is fully booked');
+      }
+    
+      final bool isPaid = event['payment_type'] == 'paid';
+    
+      // Insert the reservation record
+      await _client.from('reservations').insert({
+        'event_id': eventId,
+        'user_id': userId,
+        'created_at': DateTime.now().toIso8601String(),
+        'payment_status': isPaid ? 'pending' : 'completed'
+      });
+    
+      print('Registered user $userId for event $eventId');
+      return true;
+    } catch (e) {
+      print('Error registering for event: $e');
+      throw Exception('Failed to register for event: ${e.toString()}');
+    }
+  }
+  
+  // Optional: Add method to cancel registration
+  Future<bool> cancelRegistration(String eventId, String userId) async {
+    try {
+      await _client
+          .from('reservations')
+          .delete()
+          .match({'event_id': eventId, 'user_id': userId});
+      
+      return true;
+    } catch (e) {
+      print('Error cancelling registration: $e');
+      return false;
+    }
+  }
+
+  // Add method to update payment status
+  Future<bool> completePayment(String eventId, String userId) async {
+    try {
+      // Update the reservation status to completed
+      final result = await _client
+          .from('reservations')
+          .update({'payment_status': 'completed'})
+          .eq('event_id', eventId)
+          .eq('user_id', userId)
+          .eq('payment_status', 'pending');
+    
+      print('Payment completed for user $userId on event $eventId');
+      return true;
+    } catch (e) {
+      print('Error completing payment: $e');
+      return false;
     }
   }
 }

@@ -6,6 +6,8 @@ import '../../services/auth_service.dart';
 import '../../services/like_service.dart';
 import '../../services/comment_service.dart';
 import '../../models/comment.dart';
+import '../payment/payment_method_screen.dart';
+import '../payment/payment_success_screen.dart';
 
 class EventDetailsView extends StatefulWidget {
   final Event event;
@@ -41,29 +43,33 @@ class _EventDetailsViewState extends State<EventDetailsView> {
 
   Future<void> _loadData() async {
     try {
-      final reservationsCount = await _eventService.getReservationsCount(widget.event.id);
-      final likesCount = await _likeService.getLikesCount(widget.event.id);
-      final commentsCount = await _eventService.getCommentsCount(widget.event.id);
-      final isLiked = _authService.isLoggedIn 
-          ? await _likeService.isEventLikedByUser(widget.event.id, _authService.currentUserId)
-          : false;
+      setState(() {
+        _isLoading = true;
+      });
       
-      if (mounted) {
-        setState(() {
-          _reservationsCount = reservationsCount;
-          _likesCount = likesCount;
-          _commentsCount = commentsCount;
-          _isLiked = isLiked;
-          _isLoading = false;
-        });
+      // Get reservation count
+      _reservationsCount = await _eventService.getReservationsCount(widget.event.id);
+      
+      // Check if the current user has liked this event
+      final userId = _authService.currentUserId;
+      if (_authService.isLoggedIn) {
+        _isLiked = await _likeService.checkIfLiked(widget.event.id, userId);
       }
+      
+      // Get likes count
+      _likesCount = await _likeService.getLikesCount(widget.event.id);
+      
+      // Get comments count
+      _commentsCount = await _commentService.getCommentsCount(widget.event.id);
+      
+      setState(() {
+        _isLoading = false;
+      });
     } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
       print('Error loading data: $e');
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
     }
   }
 
@@ -96,6 +102,106 @@ class _EventDetailsViewState extends State<EventDetailsView> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error: ${e.toString()}')),
       );
+    }
+  }
+
+  // Update the _registerForEvent method to handle refreshing data properly
+  Future<void> _registerForEvent() async {
+    if (!_authService.isLoggedIn) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please log in to register for events')),
+      );
+      return;
+    }
+
+    try {
+      final userId = _authService.currentUserId;
+      
+      // Check if user is already registered
+      final isAlreadyRegistered = await _eventService.isUserRegistered(widget.event.id, userId);
+      
+      if (isAlreadyRegistered) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('You are already registered for this event')),
+        );
+        return;
+      }
+
+      // Check if event is full before registration attempt
+      if (widget.event.maxAttendees != null && _reservationsCount >= widget.event.maxAttendees!) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Sorry, this event is fully booked')),
+        );
+        return;
+      }
+
+      // Register for the event
+      final success = await _eventService.registerForEvent(widget.event.id, userId);
+      
+      if (!success) {
+        // If registration failed
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Registration failed. You may already be registered.')),
+        );
+        return;
+      }
+
+      if (widget.event.paymentType == 'free') {
+        // For free events, update UI immediately
+        await _loadData(); // Reload all data to ensure accurate count
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Registration successful! You\'re all set.'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } else {
+        // For paid events, navigate to payment screen
+        final result = await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => PaymentMethodScreen(event: widget.event),
+            settings: const RouteSettings(name: '/payment'),
+          ),
+        );
+        
+        print('Payment result: $result'); // Debug print
+        
+        // If payment was successful
+        if (result == true) {
+          await _eventService.completePayment(widget.event.id, userId);
+          
+          // Important: Refresh data to show updated spots
+          // This is likely where it's failing to refresh
+          if (mounted) {
+            setState(() {
+              _isLoading = true; // Show loading indicator
+            });
+            
+            // Get updated reservation count
+            _reservationsCount = await _eventService.getReservationsCount(widget.event.id);
+            
+            setState(() {
+              _isLoading = false;
+            });
+            
+            // Show confirmation to user
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Payment successful! You\'re registered for the event.'),
+                backgroundColor: Colors.green,
+              ),
+            );
+          }
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Registration failed: ${e.toString()}')),
+        );
+      }
     }
   }
 
@@ -212,11 +318,11 @@ class _EventDetailsViewState extends State<EventDetailsView> {
                         
                         // Bottom curve overlay
                         Positioned(
-                          bottom: -1,
+                          bottom: -2, // Change from -1 to -2 to ensure overlap
                           left: 0,
                           right: 0,
                           child: Container(
-                            height: 20,
+                            height: 24, // Increase from 20 to 24
                             decoration: const BoxDecoration(
                               color: Colors.white,
                               borderRadius: BorderRadius.vertical(
@@ -584,37 +690,49 @@ class _EventDetailsViewState extends State<EventDetailsView> {
                       ),
                     ),
                     
-                    // ADD SAVE BUTTON HERE - positioned between the interaction buttons and the spacer
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: OutlinedButton.icon(
-                        onPressed: () {
-                          // Save logic will go here
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Event saved to favorites')),
-                          );
-                        },
-                        icon: Icon(
-                          Icons.bookmark_border,
-                          color: Theme.of(context).colorScheme.primary,
-                          size: 18,
-                        ),
-                        label: Text(
-                          'Save',
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.primary,
-                            fontSize: 10
+                  // ADD SAVE BUTTON HERE - positioned between the interaction buttons and the spacer
+                      Row(
+                        children: [
+    // Space between buttons                            const SizedBox(width: 8),
+                            const SizedBox(width: 18),
+
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: () {
+                                // Save logic will go here
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                      content:
+                                          Text('Event saved to favorites')),
+                                );
+                              },
+                              icon: Icon(
+                                Icons.bookmark_border,
+                                color: Theme.of(context).colorScheme.primary,
+                                size: 18,
+                              ),
+                              label: Text(
+                                'Save',
+                                style: TextStyle(
+                                  color: Theme.of(context).colorScheme.primary,
+                                  fontSize: 14,
+                                ),
+                              ),
+                              style: OutlinedButton.styleFrom(
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                padding:
+                                      const EdgeInsets.symmetric(vertical: 10),                                side: BorderSide(
+                                    color:
+                                        Theme.of(context).colorScheme.primary),
+                              ),
+                            ),
                           ),
-                        ),
-                        style: OutlinedButton.styleFrom(
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          padding: const EdgeInsets.symmetric(vertical: 10),
-                          side: BorderSide(color: Theme.of(context).colorScheme.primary),
-                        ),
+                                                      const SizedBox(width: 18),
+
+                        ],
                       ),
-                    ),
                     
                     // Spacer
                     const SizedBox(height: 80),
@@ -641,12 +759,7 @@ class _EventDetailsViewState extends State<EventDetailsView> {
                   ],
                 ),
                 child: ElevatedButton(
-                  onPressed: () {
-                    // Registration implementation
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Registration feature coming soon!')),
-                    );
-                  },
+                  onPressed: _registerForEvent,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: theme.colorScheme.primary,
                     foregroundColor: Colors.white,
@@ -1165,3 +1278,15 @@ class _EventDetailsCommentTile extends StatelessWidget {
     );
   }
 }
+
+// When you navigate to EventDetailsView in your app, use:
+// Navigator.push(
+//   context,
+//   MaterialPageRoute(
+//     builder: (context) => EventDetailsView(
+//       event: event,
+//       controller: controller,
+//     ),
+//     settings: const RouteSettings(name: '/event_details'), // Add this line
+//   ),
+// );

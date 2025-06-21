@@ -3,6 +3,7 @@ import 'package:cmc_ev/models/user.dart' as local_user;
 import 'package:cmc_ev/navigation/bottom_navigation.dart';
 import 'package:cmc_ev/screens/admin/admin_dashboard.dart';
 import 'package:cmc_ev/screens/stagiaire/autho/auth_screen.dart';
+import 'package:cmc_ev/screens/stagiaire/home_screen.dart';
 import 'package:cmc_ev/screens/stagiaire/profil/profile_screen.dart';
 import 'package:cmc_ev/screens/stagiaire/splash_screen.dart';
 import 'package:cmc_ev/theme/app_theme.dart';
@@ -35,6 +36,7 @@ class MyApp extends StatelessWidget {
         theme: AppTheme.lightTheme,
         initialRoute: '/splash',
         routes: {
+          // '': (context)=> const HomeScreen(),
           '/splash': (context) => const SplashScreen(),
           '/auth': (context) => const AuthScreen(),
           '/home': (context) => const MainNavigation(),

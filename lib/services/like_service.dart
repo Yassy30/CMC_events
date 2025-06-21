@@ -89,4 +89,21 @@ class LikeService {
       throw Exception('Failed to toggle like status: $e');
     }
   }
+
+  // Add this method to your LikeService class
+  Future<bool> checkIfLiked(String eventId, String userId) async {
+    try {
+      final response = await SupabaseConfig.client
+          .from('likes')
+          .select()
+          .eq('event_id', eventId)
+          .eq('user_id', userId)
+          .limit(1);
+    
+      return response.isNotEmpty;
+    } catch (e) {
+      print('Error checking if event is liked: $e');
+      return false;
+    }
+  }
 }
