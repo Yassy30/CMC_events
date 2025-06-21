@@ -4,6 +4,7 @@ import 'package:cmc_ev/models/user.dart' as local_user;
 
 class ProfileService {
   final SupabaseClient _supabase = Supabase.instance.client;
+  static const String _bucketName = 'profile-pictures'; // Updated to match existing bucket
  
   // Fetch user profile
   Future<local_user.User?> getUserProfile(String userId) async {
@@ -15,48 +16,59 @@ class ProfileService {
           .single();
       return local_user.User.fromMap(response);
     } catch (e) {
-      print('Error fetching profile: $e');
-      return null;
+      print('Erreur lors de la récupération du profil : $e');
+      rethrow;
     }
   }
 
   // Update profile
-Future<bool> updateProfile(
-  String userId,
-  String username,
-  String bio, {
-  File? image,
-}) async {
-  try {
-    final updates = {
-      'username': username,
-      'bio': bio,
-      'updated_at': DateTime.now().toIso8601String(),
-    };
+  Future<bool> updateProfile(
+    String userId,
+    String username,
+    String bio, {
+    File? image,
+  }) async {
+    try {
+      // Validate inputs
+      if (username.isEmpty) {
+        throw Exception('Le nom d\'utilisateur ne peut pas être vide');
+      }
 
-    if (image != null) {
-      final imagePath = 'profile_pictures/$userId/${DateTime.now().millisecondsSinceEpoch}.jpg';
-      final uploadResponse = await _supabase.storage
-          .from('avatars')
-          .upload(imagePath, image);
-      final imageUrl = _supabase.storage.from('avatars').getPublicUrl(imagePath);
-      updates['profile_picture'] = imageUrl;
+      final updates = {
+        'username': username,
+        'bio': bio,
+        'updated_at': DateTime.now().toIso8601String(),
+      };
+
+      bool imageUploadSuccess = true;
+      if (image != null) {
+        // Validate image file
+        if (!await image.exists()) {
+          throw Exception('Le fichier image n\'existe pas');
+        }
+        final imagePath = '$userId/${DateTime.now().millisecondsSinceEpoch}.jpg';
+        try {
+          await _supabase.storage.from(_bucketName).upload(
+                imagePath,
+                image,
+                fileOptions: const FileOptions(upsert: true),
+              );
+          final imageUrl = _supabase.storage.from(_bucketName).getPublicUrl(imagePath);
+          updates['profile_picture'] = imageUrl;
+        } catch (e) {
+          imageUploadSuccess = false;
+          print('Erreur lors du téléchargement de l\'image : $e');
+          // Continue with username and bio update despite image failure
+        }
+      }
+
+      await _supabase.from('users').update(updates).eq('id', userId);
+      return imageUploadSuccess; // Return false if image upload failed, true otherwise
+    } catch (e) {
+      print('Erreur lors de la mise à jour du profil : $e');
+      rethrow;
     }
-
-    await _supabase.from('users').update(updates).eq('id', userId);
-    return true;
-  } catch (e) {
-    print('Error updating profile: $e');
-    return false;
   }
-}
-
-  // Upload profile image
-  Future<String> _uploadProfileImage(String userId, File image) async {
-  final path = 'profile-pictures/$userId.jpg';
-  await _supabase.storage.from('profile-pictures').upload(path, image);
-  return _supabase.storage.from('profile-pictures').getPublicUrl(path);
-}
 
   // Follow/Unfollow user
   Future<void> followUser(String followerId, String followedId, bool follow) async {
@@ -75,7 +87,7 @@ Future<bool> updateProfile(
             .eq('followed_id', followedId);
       }
     } catch (e) {
-      print('Error following/unfollowing: $e');
+      print('Erreur lors du suivi/désabonnement : $e');
     }
   }
 
@@ -97,7 +109,7 @@ Future<bool> updateProfile(
         'following': following.count,
       };
     } catch (e) {
-      print('Error fetching follow counts: $e');
+      print('Erreur lors de la récupération des compteurs de suivi : $e');
       return {'followers': 0, 'following': 0};
     }
   }
@@ -112,37 +124,38 @@ Future<bool> updateProfile(
           .order('created_at', ascending: false);
       return List<Map<String, dynamic>>.from(response);
     } catch (e) {
-      print('Error fetching created events: $e');
+      print('Erreur lors de la récupération des événements créés : $e');
       return [];
     }
   }
 
   // Fetch saved events
   Future<List<Map<String, dynamic>>> getSavedEvents(String userId) async {
-  try {
-    final response = await _supabase
-        .from('saved_events')
-        .select('events(*)')
-        .eq('user_id', userId)
-        .order('created_at', ascending: false);
-    // Ensure the response is a List of Maps with String keys
-    return (response as List).map((row) {
-      final event = row['events'] as Map? ?? {};
-      return event.cast<String, dynamic>();
-    }).toList();
-  } catch (e) {
-    print('Error fetching saved events: $e');
-    return [];
+    try {
+      final response = await _supabase
+          .from('saved_events')
+          .select('events(*)')
+          .eq('user_id', userId)
+          .order('created_at', ascending: false);
+      return (response as List).map((row) {
+        final event = row['events'] as Map? ?? {};
+        return event.cast<String, dynamic>();
+      }).toList();
+    } catch (e) {
+      print('Erreur lors de la récupération des événements enregistrés : $e');
+      return [];
+    }
   }
-}
-Future<bool> deleteAccount(String userId) async {
-  try {
-    await _supabase.from('users').delete().eq('id', userId);
-    await _supabase.auth.admin.deleteUser(userId);
-    return true;
-  } catch (e) {
-    print('Error deleting account: $e');
-    return false;
+
+  // Delete account
+  Future<bool> deleteAccount(String userId) async {
+    try {
+      await _supabase.from('users').delete().eq('id', userId);
+      await _supabase.auth.admin.deleteUser(userId);
+      return true;
+    } catch (e) {
+      print('Erreur lors de la suppression du compte : $e');
+      return false;
+    }
   }
-}
 }

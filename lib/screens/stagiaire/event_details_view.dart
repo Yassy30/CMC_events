@@ -12,7 +12,7 @@ import '../payment/payment_success_screen.dart';
 class EventDetailsView extends StatefulWidget {
   final Event event;
   final ScrollController controller;
-
+ 
   const EventDetailsView({
     super.key,
     required this.event,
@@ -496,7 +496,7 @@ class _EventDetailsViewState extends State<EventDetailsView> {
                                 side: BorderSide(color: theme.colorScheme.primary),
                               ),
                               child: Text(
-                                'View Profile',
+                                'Follow',
                                 style: TextStyle(
                                   color: theme.colorScheme.primary,
                                   fontSize: 12,

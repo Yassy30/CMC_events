@@ -5,17 +5,11 @@ import 'package:cmc_ev/models/user.dart' as my_models;
 
 class EditProfileScreen extends StatefulWidget {
   final my_models.User user;
-  final TextEditingController usernameController;
-  final TextEditingController bioController;
-  final File? image;
-  final VoidCallback onUpdate;
-
+  final Function(String, String, File?) onUpdate;
+  
   const EditProfileScreen({
     super.key,
     required this.user,
-    required this.usernameController,
-    required this.bioController,
-    required this.image,
     required this.onUpdate,
   });
 
@@ -23,22 +17,100 @@ class EditProfileScreen extends StatefulWidget {
   _EditProfileScreenState createState() => _EditProfileScreenState();
 }
 
-class _EditProfileScreenState extends State<EditProfileScreen> {
-  late File? _image;
+class _EditProfileScreenState extends State<EditProfileScreen> with SingleTickerProviderStateMixin {
+  late TextEditingController _usernameController;
+  late TextEditingController _bioController;
+  File? _image;
+  bool _isLoading = false;
+  late AnimationController _animationController;
+  late Animation<double> _fadeAnimation;
 
   @override
   void initState() {
     super.initState();
-    _image = widget.image;
+    _usernameController = TextEditingController(text: widget.user.username);
+    _bioController = TextEditingController(text: widget.user.bio ?? '');
+    _image = null;
+    
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    );
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
+    );
+    _animationController.forward();
   }
 
   Future<void> _pickImage() async {
-    final ImagePicker _picker = ImagePicker();
-    final pickedFile = await _picker.pickImage(source: ImageSource.gallery);
-    if (pickedFile != null) {
+    final ImagePicker picker = ImagePicker();
+    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
+    if (pickedFile != null && mounted) {
       setState(() {
         _image = File(pickedFile.path);
       });
+    }
+  }
+
+  Future<void> _saveProfile() async {
+    if (_usernameController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Le nom d\'utilisateur ne peut pas être vide')),
+      );
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final imageUploadSuccess = await widget.onUpdate(
+        _usernameController.text,
+        _bioController.text,
+        _image,
+      );
+
+      if (mounted) {
+        String message = 'Profil mis à jour avec succès';
+        if (!imageUploadSuccess && _image != null) {
+          message = 'Nom d\'utilisateur et bio mis à jour, mais échec du téléchargement de l\'image';
+        }
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(message),
+            backgroundColor: imageUploadSuccess ? null : Theme.of(context).colorScheme.error,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            margin: const EdgeInsets.all(16),
+          ),
+        );
+        Navigator.pop(context);
+      }
+    } catch (e) {
+      if (mounted) {
+        String errorMessage = 'Erreur lors de la mise à jour : $e';
+        if (e.toString().contains('bucket')) {
+          errorMessage = 'Problème avec le stockage des images. Veuillez contacter l\'administrateur.';
+        }
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: Theme.of(context).colorScheme.error,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            margin: const EdgeInsets.all(16),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -46,55 +118,167 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Edit Profile'),
-        actions: [
-          TextButton(
-            onPressed: () {
-              widget.onUpdate();
-              Navigator.pop(context);
-            },
-            child: const Text('Save'),
+        title: Text(
+          'Modifier le Profil',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 22,
+            color: Theme.of(context).colorScheme.primary,
           ),
-        ],
+        ),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        centerTitle: true,
+        leading: IconButton(
+          onPressed: () => Navigator.of(context).pop(),
+          icon: Icon(
+            Icons.arrow_back_ios_new,
+            color: Theme.of(context).colorScheme.primary,
+          ),
+        ),
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            GestureDetector(
-              onTap: _pickImage,
-              child: CircleAvatar(
-                radius: 50,
-                backgroundImage: _image != null
-                    ? FileImage(_image!)
-                    : (widget.user.profilePicture != null
-                        ? NetworkImage(widget.user.profilePicture!) as ImageProvider<Object>
-                        : null),
-                child: _image == null && widget.user.profilePicture == null
-                    ? const Icon(Icons.person, size: 50)
-                    : null,
-              ),
+      body: Container(
+        width: double.infinity,
+        height: double.infinity,
+        color: Colors.grey[50],
+        child: FadeTransition(
+          opacity: _fadeAnimation,
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              children: [
+                const SizedBox(height: 20),
+                
+                // Profile Picture
+                GestureDetector(
+                  onTap: _isLoading ? null : _pickImage,
+                  child: Stack(
+                    children: [
+                      CircleAvatar(
+                        radius: 60,
+                        backgroundColor: Colors.grey[300],
+                        backgroundImage: _image != null
+                            ? FileImage(_image!)
+                            : (widget.user.profilePicture != null
+                                ? NetworkImage(widget.user.profilePicture!)
+                                : null) as ImageProvider<Object>?,
+                        child: _image == null && widget.user.profilePicture == null
+                            ? const Icon(Icons.person, size: 60, color: Colors.grey)
+                            : null,
+                      ),
+                      Positioned(
+                        bottom: 0,
+                        right: 0,
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).colorScheme.primary,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.camera_alt,
+                            color: Colors.white,
+                            size: 20,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                
+                const SizedBox(height: 10),
+                Text(
+                  'Changer la photo de profil',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.primary,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                
+                const SizedBox(height: 40),
+                
+                // Username Field
+                _buildTextField(
+                  controller: _usernameController,
+                  label: 'Nom d\'utilisateur',
+                  icon: Icons.person,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Veuillez entrer un nom d\'utilisateur';
+                    }
+                    return null;
+                  },
+                ),
+                
+                const SizedBox(height: 20),
+                
+                // Bio Field
+                _buildTextField(
+                  controller: _bioController,
+                  label: 'Bio',
+                  icon: Icons.info,
+                  maxLines: 3,
+                ),
+                
+                const SizedBox(height: 40),
+                
+                // Save Button
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: ElevatedButton(
+                    onPressed: _isLoading ? null : _saveProfile,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Theme.of(context).colorScheme.primary,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    child: _isLoading
+                        ? const CircularProgressIndicator(color: Colors.white)
+                        : const Text(
+                            'Enregistrer',
+                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                          ),
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: widget.usernameController,
-              decoration: const InputDecoration(
-                labelText: 'Nom d\'utilisateur',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: widget.bioController,
-              decoration: const InputDecoration(
-                labelText: 'Bio',
-                border: OutlineInputBorder(),
-              ),
-              maxLines: 3,
-            ),
-          ],
+          ),
         ),
       ),
     );
+  }
+
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required String label,
+    required IconData icon,
+    int maxLines = 1,
+    String? Function(String?)? validator,
+  }) {
+    return TextFormField(
+      controller: controller,
+      decoration: InputDecoration(
+        labelText: label,
+        prefixIcon: Icon(icon),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+        ),
+        filled: true,
+        fillColor: Colors.white,
+      ),
+      maxLines: maxLines,
+      validator: validator,
+    );
+  }
+
+  @override
+  void dispose() {
+    _usernameController.dispose();
+    _bioController.dispose();
+    _animationController.dispose();
+    super.dispose();
   }
 }

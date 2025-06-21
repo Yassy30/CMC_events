@@ -1,18 +1,17 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:cmc_ev/services/auth_service.dart';
 import 'package:cmc_ev/services/profile_service.dart';
 import 'package:cmc_ev/models/user.dart' as my_models;
 import 'package:share_plus/share_plus.dart';
 import 'edit_profile_screen.dart';
-import 'package:cmc_ev/theme/app_theme.dart';
+import 'package:cmc_ev/screens/stagiaire/profil/share_profil.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
-
-  @override
+  
+  @override 
   _ProfileScreenState createState() => _ProfileScreenState();
 }
 
@@ -20,6 +19,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   final ProfileService _profileService = ProfileService();
   final AuthService _authService = AuthService();
   final ImagePicker _picker = ImagePicker();
+  
   my_models.User? user;
   File? _image;
   final _usernameController = TextEditingController();
@@ -49,10 +49,11 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
       }
       return;
     }
+
     try {
-      print('Loading profile for userId: $userId');
       final profile = await _profileService.getUserProfile(userId);
       final counts = await _profileService.getFollowCounts(userId);
+      
       if (profile != null && mounted) {
         setState(() {
           user = profile;
@@ -71,7 +72,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erreur de chargement du profil: $e')),
+          SnackBar(content: Text('Erreur de chargement du profil : $e')),
         );
       }
     }
@@ -80,9 +81,11 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   Future<void> _loadEvents() async {
     final userId = _authService.getCurrentUser()?.id;
     if (userId == null) return;
+
     try {
       final created = await _profileService.getCreatedEvents(userId);
       final saved = await _profileService.getSavedEvents(userId);
+      
       if (mounted) {
         setState(() {
           createdEvents = created;
@@ -92,7 +95,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erreur de chargement des événements: $e')),
+          SnackBar(content: Text('Erreur de chargement des événements : $e')),
         );
       }
     }
@@ -107,183 +110,231 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     }
   }
 
-  Future<void> _updateProfile() async {
+  Future<bool> _updateProfile(String username, String bio, File? image) async {
     if (user != null) {
       setState(() {
         _isLoading = true;
       });
-      final success = await _profileService.updateProfile(
-        user!.id,
-        _usernameController.text,
-        _bioController.text,
-        image: _image,
-      );
-      if (success && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Profil mis à jour avec succès')),
+      
+      try {
+        final imageUploadSuccess = await _profileService.updateProfile(
+          user!.id,
+          username,
+          bio,
+          image: image,
         );
-        _loadUserProfile();
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Échec de la mise à jour du profil')),
-        );
+        
+        if (mounted) {
+          await _loadUserProfile();
+          setState(() {
+            _image = null;
+          });
+          
+          String message = 'Profil mis à jour avec succès';
+          if (!imageUploadSuccess && image != null) {
+            message = 'Nom d\'utilisateur et bio mis à jour, mais échec du téléchargement de l\'image';
+          }
+          
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(message),
+              backgroundColor: imageUploadSuccess ? null : Theme.of(context).colorScheme.error,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              margin: const EdgeInsets.all(16),
+            ),
+          );
+        }
+        return imageUploadSuccess;
+      } catch (e) {
+        if (mounted) {
+          String errorMessage = 'Erreur : $e';
+          if (e.toString().contains('bucket')) {
+            errorMessage = 'Problème avec le stockage des images. Veuillez contacter l\'administrateur.';
+          }
+          
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(errorMessage),
+              backgroundColor: Theme.of(context).colorScheme.error,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              margin: const EdgeInsets.all(16),
+            ),
+          );
+        }
+        rethrow;
+      } finally {
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+        }
       }
-      setState(() {
-        _isLoading = false;
-      });
     }
+    return false;
   }
 
   void _navigateToEditProfile() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => EditProfileScreen(
-          user: user!,
-          usernameController: _usernameController,
-          bioController: _bioController,
-          image: _image,
-          onUpdate: _updateProfile,
+    if (user != null) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => EditProfileScreen(
+            user: user!,
+            onUpdate: _updateProfile,
+          ),
+        ),
+      );
+    }
+  }
+
+  void _showSettingsMenu() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: BoxDecoration(
+          color: Theme.of(context).scaffoldBackgroundColor,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(25)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.symmetric(vertical: 12),
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            _buildSettingsItem(
+              icon: Icons.share_rounded,
+              title: 'Partager le profil',
+              onTap: () {
+                Navigator.pop(context);
+                _shareProfile();
+              },
+            ),
+            _buildSettingsItem(
+              icon: Icons.edit_rounded,
+              title: 'Modifier le profil',
+              onTap: () {
+                Navigator.pop(context);
+                _navigateToEditProfile();
+              },
+            ),
+            _buildSettingsItem(
+              icon: Icons.delete_outline_rounded,
+              title: 'Supprimer le compte',
+              isDestructive: true,
+              onTap: () {
+                Navigator.pop(context);
+                _confirmDeleteAccount();
+              },
+            ),
+            _buildSettingsItem(
+              icon: Icons.logout_rounded,
+              title: 'Déconnexion',
+              isDestructive: true,
+              onTap: () {
+                Navigator.pop(context);
+                _confirmSignOut();
+              },
+            ),
+            const SizedBox(height: 20),
+          ],
         ),
       ),
     );
   }
 
-  void _showSettingsDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Paramètres'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                leading: const Icon(Icons.lock),
-                title: const Text('Confidentialité'),
-                onTap: () {
-                  Navigator.pop(context);
-                  _showPrivacySettings();
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.notifications),
-                title: const Text('Notifications'),
-                onTap: () {
-                  Navigator.pop(context);
-                  _showNotificationSettings();
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.language),
-                title: const Text('Langue'),
-                onTap: () {
-                  Navigator.pop(context);
-                  _showLanguagePicker();
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.share),
-                title: const Text('Partager le profil'),
-                onTap: () {
-                  Navigator.pop(context);
-                  _shareProfile();
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.delete, color: Colors.red),
-                title: const Text('Supprimer le compte', style: TextStyle(color: Colors.red)),
-                onTap: () {
-                  Navigator.pop(context);
-                  _confirmDeleteAccount();
-                },
-              ),
-            ],
+  Widget _buildSettingsItem({
+    required IconData icon,
+    required String title,
+    required VoidCallback onTap,
+    bool isDestructive = false,
+  }) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        color: Colors.grey[50],
+      ),
+      child: ListTile(
+        leading: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: isDestructive ? Colors.red.withOpacity(0.1) : Theme.of(context).colorScheme.primary.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(
+            icon,
+            color: isDestructive ? Colors.red : Theme.of(context).colorScheme.primary,
+            size: 20,
           ),
         ),
-      ),
-    );
-  }
-
-  void _showPrivacySettings() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Paramètres de confidentialité'),
-        content: const Text('Ici, vous pouvez gérer qui peut voir votre profil et vos événements.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Fermer'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showNotificationSettings() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Paramètres de notifications'),
-        content: const Text('Ici, vous pouvez activer/désactiver les notifications.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Fermer'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showLanguagePicker() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Choisir une langue'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                title: const Text('Français'),
-                onTap: () {
-                  Navigator.pop(context);
-                  // TODO: Implement language change logic
-                },
-              ),
-              ListTile(
-                title: const Text('English'),
-                onTap: () {
-                  Navigator.pop(context);
-                  // TODO: Implement language change logic
-                },
-              ),
-            ],
+        title: Text(
+          title,
+          style: TextStyle(
+            color: isDestructive ? Colors.red : Theme.of(context).colorScheme.onSurface,
+            fontWeight: FontWeight.w500,
           ),
         ),
+        onTap: onTap,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
     );
   }
 
   void _shareProfile() {
-    final userId = _authService.getCurrentUser()?.id;
-    if (userId != null) {
-      Share.share('Découvrez mon profil sur IN\'CMC : https://app.incmc.com/profile/$userId');
-    }
+  if (user != null) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ShareProfileScreen(user: user!),
+      ),
+    );
+  }
+}
+
+  void _confirmSignOut() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Déconnexion'),
+        content: const Text('Voulez-vous vous déconnecter ?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Annuler', style: TextStyle(color: Colors.grey[600])),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _signOut();
+            },
+            child: const Text('Déconnexion', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
   }
 
   void _confirmDeleteAccount() {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Confirmer la suppression'),
-        content: const Text('Êtes-vous sûr de vouloir supprimer votre compte ? Cette action est irréversible.'),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Supprimer le compte'),
+        content: const Text('Voulez-vous vraiment supprimer votre compte ? Cette action est irréversible.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Annuler'),
+            child: Text('Annuler', style: TextStyle(color: Colors.grey[600])),
           ),
           TextButton(
             onPressed: () {
@@ -298,24 +349,215 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   }
 
   Future<void> _deleteAccount() async {
-    final userId = _authService.getCurrentUser()?.id;
-    if (userId != null) {
-      setState(() {
-        _isLoading = true;
-      });
-      final success = await _profileService.deleteAccount(userId);
-      if (success && mounted) {
+    setState(() {
+      _isLoading = true;
+    });
+    
+    try {
+      final userId = _authService.getCurrentUser()?.id;
+      if (userId != null) {
+        await _profileService.deleteAccount(userId);
         await _authService.signOut();
-        Navigator.pushReplacementNamed(context, '/auth');
-      } else {
+        if (mounted) {
+          Navigator.pushReplacementNamed(context, '/auth');
+        }
+      }
+    } catch (e) {
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Échec de la suppression du compte')),
+          SnackBar(content: Text('Erreur lors de la suppression du compte : $e')),
         );
       }
-      setState(() {
-        _isLoading = false;
-      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
+  }
+
+  Future<void> _signOut() async {
+    setState(() {
+      _isLoading = true;
+    });
+    
+    try {
+      await _authService.signOut();
+      if (mounted) {
+        Navigator.pushReplacementNamed(context, '/auth');
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur lors de la déconnexion : $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Profil', style: Theme.of(context).textTheme.titleLarge),
+        automaticallyImplyLeading: false, // Remove back button
+        actions: [
+          IconButton(
+            icon: Icon(Icons.settings, color: Theme.of(context).colorScheme.primary),
+            onPressed: _showSettingsMenu,
+          ),
+        ],
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+      ),
+      body: Container(
+        color: Colors.white,
+        child: SafeArea(
+          child: user == null
+              ? Center(child: CircularProgressIndicator())
+              : SingleChildScrollView(
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        // Profile Picture
+                        GestureDetector(
+                          onTap: _isLoading ? null : _pickImage,
+                          child: CircleAvatar(
+                            radius: 60,
+                            backgroundImage: _image != null
+                                ? FileImage(_image!)
+                                : (user!.profilePicture != null
+                                    ? NetworkImage(user!.profilePicture!)
+                                    : null) as ImageProvider<Object>?,
+                            child: user!.profilePicture == null && _image == null
+                                ? Icon(Icons.person, size: 60, color: Colors.grey[400])
+                                : null,
+                          ),
+                        ),
+                        SizedBox(height: 12),
+                        // Username
+                        Text(
+                          user!.username,
+                          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: Theme.of(context).colorScheme.onSurface,
+                              ),
+                        ),
+                        Text(
+                          '@${user!.username.toLowerCase()}',
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                color: Colors.grey[600],
+                              ),
+                        ),
+                        // Bio
+                        if (user!.bio != null && user!.bio!.isNotEmpty) ...[
+                          SizedBox(height: 8),
+                          Text(
+                            user!.bio!,
+                            style: Theme.of(context).textTheme.bodyLarge,
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
+                        SizedBox(height: 16),
+                        // Stats
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            _StatItem(
+                              label: 'Événements',
+                              value: createdEvents.length.toString(),
+                            ),
+                            SizedBox(width: 24),
+                            _StatItem(
+                              label: 'Abonnés',
+                              value: followCounts['followers'].toString(),
+                            ),
+                            SizedBox(width: 24),
+                            _StatItem(
+                              label: 'Abonnements',
+                              value: followCounts['following'].toString(),
+                            ),
+                          ],
+                        ),
+                        SizedBox(height: 24),
+                        // TabBar
+                        TabBar(
+                          controller: _tabController,
+                          labelColor: Theme.of(context).colorScheme.primary,
+                          unselectedLabelColor: Colors.grey[600],
+                          indicatorColor: Theme.of(context).colorScheme.primary,
+                          labelStyle: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                          tabs: [
+                            Tab(text: 'Créés'),
+                            Tab(text: 'Enregistrés'),
+                          ],
+                        ),
+                        SizedBox(
+                          height: 300,
+                          child: TabBarView(
+                            controller: _tabController,
+                            children: [
+                              _buildEventGrid(createdEvents),
+                              _buildEventGrid(savedEvents),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEventGrid(List<Map<String, dynamic>> events) {
+    return GridView.builder(
+      padding: EdgeInsets.all(8),
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        crossAxisSpacing: 8,
+        mainAxisSpacing: 8,
+        childAspectRatio: 1,
+      ),
+      itemCount: events.length,
+      itemBuilder: (context, index) {
+        final event = events[index];
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: event['image_url'] != null
+              ? Image.network(
+                  event['image_url'],
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) => Icon(
+                    Icons.event,
+                    size: 40,
+                    color: Colors.grey[400],
+                  ),
+                  loadingBuilder: (context, child, loadingProgress) {
+                    if (loadingProgress == null) return child;
+                    return Center(child: CircularProgressIndicator());
+                  },
+                )
+              : Icon(
+                  Icons.event,
+                  size: 40,
+                  color: Colors.grey[400],
+                ),
+        );
+      },
+    );
   }
 
   @override
@@ -324,164 +566,6 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     _bioController.dispose();
     _tabController.dispose();
     super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.settings),
-            onPressed: _showSettingsDialog,
-          ),
-        ],
-      ),
-      body: user == null
-          ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Center(
-                      child: Column(
-                        children: [
-                          GestureDetector(
-                            onTap: _pickImage,
-                            child: CircleAvatar(
-                              radius: 50,
-                              backgroundImage: _image != null
-                                  ? FileImage(_image!)
-                                  : (user!.profilePicture != null
-                                      ? NetworkImage(user!.profilePicture!) as ImageProvider<Object>
-                                      : null),
-                              child: user!.profilePicture == null && _image == null
-                                  ? const Icon(Icons.person, size: 50)
-                                  : null,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            user!.username,
-                            style: const TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          Text(
-                            ' ${user!.username.toLowerCase()}',
-                            style: TextStyle(
-                              fontSize: 16,
-                              color: Colors.grey[600],
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            user!.email,
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey[600],
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            
-                            children: [
-                              _StatItem(
-                                label: 'Événements',
-                                value: createdEvents.length.toString(),
-                              ),
-                              const SizedBox(width: 16),
-                              _StatItem(
-                                label: 'Abonnés',
-                                value: followCounts['followers'].toString(),
-                              ),
-                              const SizedBox(width: 16),
-                              _StatItem(
-                                label: 'Abonnements',
-                                value: followCounts['following'].toString(),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 16),
-                          ElevatedButton(
-                            onPressed: _navigateToEditProfile,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppTheme.lightTheme.colorScheme.secondary,
-                              foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                            ),
-                            child: const Text('Edit profile'),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    TabBar(
-                      controller: _tabController,
-                      labelColor:  AppTheme.lightTheme.colorScheme.primary,
-                      unselectedLabelColor: Colors.grey[600],
-                      indicatorColor:  AppTheme.lightTheme.colorScheme.primary,
-
-                      tabs: const [
-                        Tab(text: 'Created'),
-                        Tab(text: 'Saved'),
-                      ],
-                    ),
-                    SizedBox(
-                      height: 400, // Adjust based on screen size
-                      child: TabBarView(
-                        controller: _tabController,
-                        children: [
-                          _buildEventGrid(createdEvents),
-                          _buildEventGrid(savedEvents),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-    );
-  }
-
-  Widget _buildEventGrid(List<Map<String, dynamic>> events) {
-    return GridView.builder(
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        crossAxisSpacing: 8,
-        mainAxisSpacing: 8,
-      ),
-      itemCount: events.length,
-      itemBuilder: (context, index) {
-        final event = events[index];
-        return Card(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-          clipBehavior: Clip.antiAlias,
-          child: event['image_url'] != null
-              ? Image.network(
-                  event['image_url'],
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) =>
-                      const Icon(Icons.event),
-                  loadingBuilder: (context, child, loadingProgress) {
-                    if (loadingProgress == null) return child;
-                    return const Center(child: CircularProgressIndicator());
-                  },
-                )
-              : const Icon(Icons.event),
-        );
-      },
-    );
   }
 }
 
@@ -500,18 +584,16 @@ class _StatItem extends StatelessWidget {
       children: [
         Text(
           value,
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: AppTheme.lightTheme.colorScheme.primary,
-          ),
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: Theme.of(context).colorScheme.primary,
+              ),
         ),
         Text(
           label,
-          style: TextStyle(
-            fontSize: 14,
-            color: AppTheme.lightTheme.colorScheme.primary,
-          ),
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
         ),
       ],
     );

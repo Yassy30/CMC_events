@@ -232,13 +232,13 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
       }
 
       print('Creating event with creatorId: $creatorId, paymentType: $paymentType, ticketPrice: $ticketPrice');
-      await _eventService.createEvent(
+
+  await _eventService.createEvent(
         title: _titleController.text,
         description: _descriptionController.text,
-        creatorId: creatorId,
         startDate: startDate,
         location: _locationController.text,
-        category: _mapDisplayCategoryToDatabase(_selectedCategory!),
+        category: _selectedCategory!,
         paymentType: paymentType,
         ticketPrice: ticketPrice,
         maxAttendees: int.tryParse(_maxAttendeesController.text),
@@ -332,12 +332,12 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                 labelText: 'Catégorie',
                 border: OutlineInputBorder(),
               ),
-              items: _categories.map((String category) {
-                return DropdownMenuItem<String>(
-                  value: category,
-                  child: Text(category[0].toUpperCase() + category.substring(1)),
-                );
-              }).toList(),
+items: _categories.map((category) {
+  return DropdownMenuItem<String>(
+    value: category,
+    child: Text(category),
+  );
+}).toList(),
               onChanged: (String? newValue) {
                 setState(() {
                   _selectedCategory = newValue;
