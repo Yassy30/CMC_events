@@ -41,7 +41,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     'Gaming',
     'Music',
     'Tech',
-    'Other'
+   
   ];
 
   @override
@@ -179,7 +179,6 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
       'Sports': 'sport',
       'Competition': 'competition',
       'Culture': 'culture',
-      'Other': 'other',
     };
     
     return categoryMap[displayCategory] ?? 'other';
