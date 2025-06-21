@@ -21,7 +21,7 @@ class _MainNavigationState extends State<MainNavigation> {
     const HomeScreen(),
     const DiscoverScreen(),
     const CreateEventScreen(),
-    const ProfileScreen(),
+    ProfileScreen(),
   ];
 
   @override

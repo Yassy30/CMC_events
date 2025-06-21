@@ -361,7 +361,7 @@ class SmallEventCard extends StatefulWidget {
 
   const SmallEventCard({super.key, required this.event});
 
-  @override 
+  @override
   State<SmallEventCard> createState() => _SmallEventCardState();
 } 
 

@@ -17,7 +17,9 @@ import 'package:cmc_ev/screens/stagiaire/event_details_full_page.dart' as event_
 import 'package:cmc_ev/screens/stagiaire/home_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
-  const ProfileScreen({super.key});
+  final String? userId; // Add optional userId parameter
+
+  const ProfileScreen({super.key, this.userId});
   
   @override 
   _ProfileScreenState createState() => _ProfileScreenState();
@@ -37,6 +39,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   List<Map<String, dynamic>> savedEvents = [];
   bool _isLoading = false;
   late TabController _tabController;
+  bool _isCurrentUser = false;
 
   @override
   void initState() {
@@ -47,8 +50,10 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   }
 
   Future<void> _loadUserProfile() async {
-    final userId = _authService.getCurrentUser()?.id;
-    if (userId == null) {
+    final currentUserId = _authService.getCurrentUser()?.id;
+    final targetUserId = widget.userId ?? currentUserId;
+    
+    if (targetUserId == null) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Utilisateur non connecté')),
@@ -58,9 +63,13 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
       return;
     }
 
+    setState(() {
+      _isCurrentUser = targetUserId == currentUserId;
+    });
+
     try {
-      final profile = await _profileService.getUserProfile(userId);
-      final counts = await _profileService.getFollowCounts(userId);
+      final profile = await _profileService.getUserProfile(targetUserId);
+      final counts = await _profileService.getFollowCounts(targetUserId);
       
       if (profile != null && mounted) {
         setState(() {
@@ -87,12 +96,12 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   }
 
   Future<void> _loadEvents() async {
-    final userId = _authService.getCurrentUser()?.id;
-    if (userId == null) return;
+    final targetUserId = widget.userId ?? _authService.getCurrentUser()?.id;
+    if (targetUserId == null) return;
 
     try {
-      final created = await _profileService.getCreatedEvents(userId);
-      final saved = await _profileService.getSavedEvents(userId);
+      final created = await _profileService.getCreatedEvents(targetUserId);
+      final saved = await _profileService.getSavedEvents(targetUserId);
       
       if (mounted) {
         setState(() {
@@ -110,6 +119,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   }
 
   Future<void> _pickImage() async {
+    if (!_isCurrentUser) return; // Only allow image picking for current user
     final pickedFile = await _picker.pickImage(source: ImageSource.gallery);
     if (pickedFile != null && mounted) {
       setState(() {
@@ -119,7 +129,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   }
 
   Future<bool> _updateProfile(String username, String bio, File? image) async {
-    if (user != null) {
+    if (user != null && _isCurrentUser) {
       setState(() {
         _isLoading = true;
       });
@@ -184,7 +194,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   }
 
   void _navigateToEditProfile() {
-    if (user != null) {
+    if (user != null && _isCurrentUser) {
       Navigator.push(
         context,
         MaterialPageRoute(
@@ -198,6 +208,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   }
 
   void _showSettingsMenu() {
+    if (!_isCurrentUser) return; // Only show settings for current user
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -414,14 +425,16 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Profil', style: Theme.of(context).textTheme.titleLarge),
-        automaticallyImplyLeading: false,
-        actions: [
-          IconButton(
-            icon: Icon(Icons.settings, color: Theme.of(context).colorScheme.primary),
-            onPressed: _showSettingsMenu,
-          ),
-        ],
+        title: Text(_isCurrentUser ? 'Profil' : user?.username ?? 'Profil', style: Theme.of(context).textTheme.titleLarge),
+        automaticallyImplyLeading: true, // Allow back button for non-current user
+        actions: _isCurrentUser
+            ? [
+                IconButton(
+                  icon: Icon(Icons.settings, color: Theme.of(context).colorScheme.primary),
+                  onPressed: _showSettingsMenu,
+                ),
+              ]
+            : [],
         backgroundColor: Colors.transparent,
         elevation: 0,
       ),
@@ -437,7 +450,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
                         GestureDetector(
-                          onTap: _isLoading ? null : _pickImage,
+                          onTap: _isCurrentUser ? (_isLoading ? null : _pickImage) : null,
                           child: CircleAvatar(
                             radius: 60,
                             backgroundImage: _image != null
@@ -507,7 +520,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                           ],
                         ),
                         SizedBox(
-                          height: 400, // Increased height to accommodate cards
+                          height: 400,
                           child: TabBarView(
                             controller: _tabController,
                             children: [
@@ -531,7 +544,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
       itemCount: events.length,
       itemBuilder: (context, index) {
         final eventMap = events[index];
-        final event = Event.fromJson(eventMap); // Convert Map to Event object
+        final event = Event.fromJson(eventMap);
         return Padding(
           padding: const EdgeInsets.only(bottom: 16),
           child: ProfileEventCard(event: event),
@@ -784,7 +797,7 @@ class _ProfileEventCardState extends State<ProfileEventCard> {
             child: Stack(
               children: [
                 AspectRatio(
-                  aspectRatio: 16 / 8, // Same as SmallEventCard
+                  aspectRatio: 16 / 8,
                   child: Image.network(
                     widget.event.imageUrl,
                     fit: BoxFit.cover,
@@ -818,7 +831,6 @@ class _ProfileEventCardState extends State<ProfileEventCard> {
               ],
             ),
           ),
-          
           Padding(
             padding: const EdgeInsets.all(10.0),
             child: Column(
@@ -833,9 +845,7 @@ class _ProfileEventCardState extends State<ProfileEventCard> {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
-                
                 SizedBox(height: 6),
-                
                 Row(
                   children: [
                     Icon(
@@ -857,9 +867,7 @@ class _ProfileEventCardState extends State<ProfileEventCard> {
                     ),
                   ],
                 ),
-                
                 SizedBox(height: 2),
-                
                 Row(
                   children: [
                     Icon(
@@ -877,9 +885,7 @@ class _ProfileEventCardState extends State<ProfileEventCard> {
                     ),
                   ],
                 ),
-                
                 SizedBox(height: 8),
-                
                 Row(
                   children: [
                     _buildSocialAction(
@@ -889,27 +895,21 @@ class _ProfileEventCardState extends State<ProfileEventCard> {
                       isActive: _isLiked,
                       color: _isLiked ? Colors.red : Colors.grey[600],
                     ),
-                    
                     SizedBox(width: 12),
-                    
                     _buildSocialAction(
                       icon: Icons.chat_bubble_outline,
                       text: '$_commentsCount',
                       onTap: () => _showComments(context),
                       color: Colors.grey[600],
                     ),
-                    
                     SizedBox(width: 12),
-                    
                     _buildSocialAction(
                       icon: Icons.share_outlined,
                       text: 'Share',
                       onTap: () => _shareEvent(context),
                       color: Colors.grey[600],
                     ),
-                    
                     Spacer(),
-                    
                     OutlinedButton(
                       onPressed: () => _showEventDetails(context),
                       style: OutlinedButton.styleFrom(
