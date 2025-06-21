@@ -175,11 +175,10 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     // Map from display categories to database categories
     final Map<String, String> categoryMap = {
       'All Events': 'other',
-      'Art & Design': 'culture',
+      'Art & Design': 'art_design',
       'Sports': 'sport',
-      'Gaming': 'competition',
-      'Music': 'music',
-      'Tech': 'tech',
+      'Competition': 'competition',
+      'Culture': 'culture',
       'Other': 'other',
     };
     

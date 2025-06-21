@@ -31,9 +31,8 @@ class _HomeScreenState extends State<HomeScreen> {
     {'name': 'All Events', 'icon': Icons.event},
     {'name': 'Art & Design', 'icon': Icons.brush_outlined},
     {'name': 'Sports', 'icon': Icons.sports_basketball_outlined},
-    {'name': 'Gaming', 'icon': Icons.sports_esports_outlined},
-    {'name': 'Music', 'icon': Icons.music_note_outlined},
-    {'name': 'Tech', 'icon': Icons.computer_outlined},
+    {'name': 'Competition', 'icon': Icons.sports_esports_outlined},
+    {'name': 'Culture', 'icon': Icons.theater_comedy_outlined},
   ];
 
   @override
@@ -106,10 +105,9 @@ class _HomeScreenState extends State<HomeScreen> {
     // Map from database categories to display categories
     final Map<String, String> categoryMap = {
       'sport': 'sports',
-      'culture': 'art & design',
-      'competition': 'gaming',
-      'music': 'music',
-      'tech': 'tech',
+      'culture': 'culture',
+      'competition': 'competition',
+      'art_design': 'art & design',
       'other': 'other',
     };
     
