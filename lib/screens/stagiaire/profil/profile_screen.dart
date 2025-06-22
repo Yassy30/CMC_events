@@ -7,9 +7,19 @@ import 'package:cmc_ev/models/user.dart' as my_models;
 import 'package:share_plus/share_plus.dart';
 import 'edit_profile_screen.dart';
 import 'package:cmc_ev/screens/stagiaire/profil/share_profil.dart';
+import 'package:cmc_ev/screens/stagiaire/event_details_view.dart';
+import 'package:cmc_ev/models/event.dart';
+import 'package:intl/intl.dart';
+import 'package:cmc_ev/services/event_service.dart';
+import 'package:cmc_ev/services/like_service.dart';
+import 'package:cmc_ev/services/comment_service.dart';
+import 'package:cmc_ev/screens/stagiaire/event_details_full_page.dart' as event_details_full_page;
+import 'package:cmc_ev/screens/stagiaire/home_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
-  const ProfileScreen({super.key});
+  final String? userId; // Add optional userId parameter
+
+  const ProfileScreen({super.key, this.userId});
   
   @override 
   _ProfileScreenState createState() => _ProfileScreenState();
@@ -29,6 +39,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   List<Map<String, dynamic>> savedEvents = [];
   bool _isLoading = false;
   late TabController _tabController;
+  bool _isCurrentUser = false;
 
   @override
   void initState() {
@@ -39,8 +50,10 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   }
 
   Future<void> _loadUserProfile() async {
-    final userId = _authService.getCurrentUser()?.id;
-    if (userId == null) {
+    final currentUserId = _authService.getCurrentUser()?.id;
+    final targetUserId = widget.userId ?? currentUserId;
+    
+    if (targetUserId == null) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Utilisateur non connecté')),
@@ -50,9 +63,13 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
       return;
     }
 
+    setState(() {
+      _isCurrentUser = targetUserId == currentUserId;
+    });
+
     try {
-      final profile = await _profileService.getUserProfile(userId);
-      final counts = await _profileService.getFollowCounts(userId);
+      final profile = await _profileService.getUserProfile(targetUserId);
+      final counts = await _profileService.getFollowCounts(targetUserId);
       
       if (profile != null && mounted) {
         setState(() {
@@ -79,12 +96,12 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   }
 
   Future<void> _loadEvents() async {
-    final userId = _authService.getCurrentUser()?.id;
-    if (userId == null) return;
+    final targetUserId = widget.userId ?? _authService.getCurrentUser()?.id;
+    if (targetUserId == null) return;
 
     try {
-      final created = await _profileService.getCreatedEvents(userId);
-      final saved = await _profileService.getSavedEvents(userId);
+      final created = await _profileService.getCreatedEvents(targetUserId);
+      final saved = await _profileService.getSavedEvents(targetUserId);
       
       if (mounted) {
         setState(() {
@@ -102,6 +119,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   }
 
   Future<void> _pickImage() async {
+    if (!_isCurrentUser) return; // Only allow image picking for current user
     final pickedFile = await _picker.pickImage(source: ImageSource.gallery);
     if (pickedFile != null && mounted) {
       setState(() {
@@ -111,7 +129,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   }
 
   Future<bool> _updateProfile(String username, String bio, File? image) async {
-    if (user != null) {
+    if (user != null && _isCurrentUser) {
       setState(() {
         _isLoading = true;
       });
@@ -176,7 +194,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   }
 
   void _navigateToEditProfile() {
-    if (user != null) {
+    if (user != null && _isCurrentUser) {
       Navigator.push(
         context,
         MaterialPageRoute(
@@ -190,6 +208,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   }
 
   void _showSettingsMenu() {
+    if (!_isCurrentUser) return; // Only show settings for current user
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -290,15 +309,15 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   }
 
   void _shareProfile() {
-  if (user != null) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => ShareProfileScreen(user: user!),
-      ),
-    );
+    if (user != null) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ShareProfileScreen(user: user!),
+        ),
+      );
+    }
   }
-}
 
   void _confirmSignOut() {
     showDialog(
@@ -406,14 +425,16 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Profil', style: Theme.of(context).textTheme.titleLarge),
-        automaticallyImplyLeading: false, // Remove back button
-        actions: [
-          IconButton(
-            icon: Icon(Icons.settings, color: Theme.of(context).colorScheme.primary),
-            onPressed: _showSettingsMenu,
-          ),
-        ],
+        title: Text(_isCurrentUser ? 'Profil' : user?.username ?? 'Profil', style: Theme.of(context).textTheme.titleLarge),
+        automaticallyImplyLeading: true, // Allow back button for non-current user
+        actions: _isCurrentUser
+            ? [
+                IconButton(
+                  icon: Icon(Icons.settings, color: Theme.of(context).colorScheme.primary),
+                  onPressed: _showSettingsMenu,
+                ),
+              ]
+            : [],
         backgroundColor: Colors.transparent,
         elevation: 0,
       ),
@@ -428,9 +449,8 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        // Profile Picture
                         GestureDetector(
-                          onTap: _isLoading ? null : _pickImage,
+                          onTap: _isCurrentUser ? (_isLoading ? null : _pickImage) : null,
                           child: CircleAvatar(
                             radius: 60,
                             backgroundImage: _image != null
@@ -444,7 +464,6 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                           ),
                         ),
                         SizedBox(height: 12),
-                        // Username
                         Text(
                           user!.username,
                           style: Theme.of(context).textTheme.headlineSmall?.copyWith(
@@ -458,7 +477,6 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                                 color: Colors.grey[600],
                               ),
                         ),
-                        // Bio
                         if (user!.bio != null && user!.bio!.isNotEmpty) ...[
                           SizedBox(height: 8),
                           Text(
@@ -468,7 +486,6 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                           ),
                         ],
                         SizedBox(height: 16),
-                        // Stats
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
@@ -489,7 +506,6 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                           ],
                         ),
                         SizedBox(height: 24),
-                        // TabBar
                         TabBar(
                           controller: _tabController,
                           labelColor: Theme.of(context).colorScheme.primary,
@@ -504,12 +520,12 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                           ],
                         ),
                         SizedBox(
-                          height: 300,
+                          height: 400,
                           child: TabBarView(
                             controller: _tabController,
                             children: [
-                              _buildEventGrid(createdEvents),
-                              _buildEventGrid(savedEvents),
+                              _buildEventList(createdEvents),
+                              _buildEventList(savedEvents),
                             ],
                           ),
                         ),
@@ -522,39 +538,16 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     );
   }
 
-  Widget _buildEventGrid(List<Map<String, dynamic>> events) {
-    return GridView.builder(
+  Widget _buildEventList(List<Map<String, dynamic>> events) {
+    return ListView.builder(
       padding: EdgeInsets.all(8),
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        crossAxisSpacing: 8,
-        mainAxisSpacing: 8,
-        childAspectRatio: 1,
-      ),
       itemCount: events.length,
       itemBuilder: (context, index) {
-        final event = events[index];
-        return ClipRRect(
-          borderRadius: BorderRadius.circular(8),
-          child: event['image_url'] != null
-              ? Image.network(
-                  event['image_url'],
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) => Icon(
-                    Icons.event,
-                    size: 40,
-                    color: Colors.grey[400],
-                  ),
-                  loadingBuilder: (context, child, loadingProgress) {
-                    if (loadingProgress == null) return child;
-                    return Center(child: CircularProgressIndicator());
-                  },
-                )
-              : Icon(
-                  Icons.event,
-                  size: 40,
-                  color: Colors.grey[400],
-                ),
+        final eventMap = events[index];
+        final event = Event.fromJson(eventMap);
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 16),
+          child: ProfileEventCard(event: event),
         );
       },
     );
@@ -596,6 +589,386 @@ class _StatItem extends StatelessWidget {
               ),
         ),
       ],
+    );
+  }
+}
+
+class ProfileEventCard extends StatefulWidget {
+  final Event event;
+
+  const ProfileEventCard({super.key, required this.event});
+
+  @override 
+  State<ProfileEventCard> createState() => _ProfileEventCardState();
+} 
+
+class _ProfileEventCardState extends State<ProfileEventCard> {
+  final _eventService = EventService();
+  final _likeService = LikeService();
+  final _commentService = CommentService();
+  final _authService = AuthService();
+  
+  int _likesCount = 0;
+  int _commentsCount = 0;
+  bool _isLiked = false;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadEventData();
+  }
+
+  Future<void> _loadEventData() async {
+    try {
+      final likesCountFuture = _likeService.getLikesCount(widget.event.id);
+      final commentsCountFuture = _eventService.getCommentsCount(widget.event.id);
+      
+      List<dynamic> results = [0, 0, false];
+      
+      if (_authService.isLoggedIn) {
+        final userId = _authService.currentUserId;
+        final isLikedFuture = _likeService.isEventLikedByUser(widget.event.id, userId);
+        
+        results = await Future.wait([
+          likesCountFuture,
+          commentsCountFuture,
+          isLikedFuture,
+        ]);
+      } else {
+        final partialResults = await Future.wait([
+          likesCountFuture,
+          commentsCountFuture,
+        ]);
+        
+        results[0] = partialResults[0];
+        results[1] = partialResults[1];
+      }
+      
+      if (mounted) {
+        setState(() {
+          _likesCount = results[0] as int;
+          _commentsCount = results[1] as int;
+          _isLiked = _authService.isLoggedIn ? (results[2] as bool) : false;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      print('Error loading event data: $e');
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _toggleLike() async {
+    if (!_authService.isLoggedIn) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please log in to like events'))
+      );
+      return;
+    }
+
+    try {
+      final userId = _authService.currentUserId;
+      final wasLiked = _isLiked;
+      
+      final isLiked = await _likeService.toggleLike(widget.event.id, userId);
+      
+      if (mounted) {
+        setState(() {
+          if (wasLiked != isLiked) {
+            _likesCount = isLiked ? _likesCount + 1 : _likesCount - 1;
+          }
+          _isLiked = isLiked;
+        });
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: ${e.toString()}'))
+      );
+    }
+  }
+
+  void _showEventDetails(BuildContext context) {
+    final scrollController = ScrollController();
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => event_details_full_page.EventDetailsFullPage(
+          event: widget.event,
+          controller: scrollController,
+        ),
+      ),
+    );
+  }
+
+  void _showComments(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        final scrollController = ScrollController();
+        
+        return Container(
+          height: MediaQuery.of(context).size.height * 0.75,
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            children: [
+              Container(
+                margin: const EdgeInsets.only(top: 10),
+                height: 5,
+                width: 40,
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Row(
+                  children: [
+                    const Text(
+                      'Comments',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const Spacer(),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(),
+              Expanded(
+                child: CommentsSection(
+                  eventId: widget.event.id,
+                  controller: scrollController,
+                  onCommentAdded: () async {
+                    final commentsCount = await _eventService.getCommentsCount(widget.event.id);
+                    if (mounted) {
+                      setState(() {
+                        _commentsCount = commentsCount;
+                      });
+                    }
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _shareEvent(BuildContext context) {
+    Share.share(
+      'Join this event: ${widget.event.title} at ${widget.event.location ?? 'TBD'} on ${DateFormat('yyyy-MM-dd HH:mm').format(widget.event.startDate)}! Category: ${widget.event.category}',
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    
+    return Card(
+      margin: EdgeInsets.zero,
+      clipBehavior: Clip.antiAlias,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10),
+        side: BorderSide(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          GestureDetector(
+            onTap: () => _showEventDetails(context),
+            child: Stack(
+              children: [
+                AspectRatio(
+                  aspectRatio: 16 / 8,
+                  child: Image.network(
+                    widget.event.imageUrl,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) {
+                      return Container(
+                        color: Colors.grey[300],
+                        child: const Icon(Icons.error),
+                      );
+                    },
+                  ),
+                ),
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: Container(
+                    padding: EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.6),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      widget.event.paymentType == 'paid' ? 'Paid' : 'Free',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(10.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  widget.event.title,
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                SizedBox(height: 6),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.location_on_outlined, 
+                      size: 12, 
+                      color: Colors.grey[600],
+                    ),
+                    SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        widget.event.location ?? 'No location specified',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Colors.grey[600],
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(height: 2),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.calendar_today_outlined, 
+                      size: 12, 
+                      color: Colors.grey[600],
+                    ),
+                    SizedBox(width: 4),
+                    Text(
+                      DateFormat('E, MMM d • h:mm a').format(widget.event.startDate),
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(height: 8),
+                Row(
+                  children: [
+                    _buildSocialAction(
+                      icon: _isLiked ? Icons.favorite : Icons.favorite_border,
+                      text: '$_likesCount',
+                      onTap: _toggleLike,
+                      isActive: _isLiked,
+                      color: _isLiked ? Colors.red : Colors.grey[600],
+                    ),
+                    SizedBox(width: 12),
+                    _buildSocialAction(
+                      icon: Icons.chat_bubble_outline,
+                      text: '$_commentsCount',
+                      onTap: () => _showComments(context),
+                      color: Colors.grey[600],
+                    ),
+                    SizedBox(width: 12),
+                    _buildSocialAction(
+                      icon: Icons.share_outlined,
+                      text: 'Share',
+                      onTap: () => _shareEvent(context),
+                      color: Colors.grey[600],
+                    ),
+                    Spacer(),
+                    OutlinedButton(
+                      onPressed: () => _showEventDetails(context),
+                      style: OutlinedButton.styleFrom(
+                        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+                        minimumSize: Size(0, 24),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        side: BorderSide(color: theme.colorScheme.primary, width: 1),
+                      ),
+                      child: Text(
+                        'Details',
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: theme.colorScheme.primary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSocialAction({
+    required IconData icon,
+    required String text,
+    required VoidCallback onTap,
+    bool isActive = false,
+    Color? color,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(4),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Row(
+          children: [
+            Icon(
+              icon,
+              size: 14,
+              color: color,
+            ),
+            SizedBox(width: 4),
+            Text(
+              text,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+                color: color,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
