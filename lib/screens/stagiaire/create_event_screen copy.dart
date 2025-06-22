@@ -237,7 +237,15 @@ String _formatCategoryDisplay(String category) {
       }
 
       print('Creating event with creatorId: $creatorId, paymentType: $paymentType, ticketPrice: $ticketPrice');
-
+  // await _eventService.createEvent(
+  //   title: 'My Event',
+  //   description: 'Event Description',
+  //   startDate: DateTime.now().add(Duration(days: 1)),
+  //   location: 'Event Location',
+  //   category: 'culture',
+  //   paymentType: 'Free',
+  //   imageUrl: 'https://example.com/image.jpg',
+  // );
   await _eventService.createEvent(
         title: _titleController.text,
         description: _descriptionController.text,
@@ -274,7 +282,6 @@ String _formatCategoryDisplay(String category) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Créer un événement'),
-        automaticallyImplyLeading: false,
       ),
       floatingActionButton: Column(
         mainAxisAlignment: MainAxisAlignment.end,
@@ -338,12 +345,12 @@ String _formatCategoryDisplay(String category) {
                 labelText: 'Catégorie',
                 border: OutlineInputBorder(),
               ),
-            items: _categories.entries.map((entry) {
-              return DropdownMenuItem<String>(
-                value: entry.key, // Raw enum value (e.g., 'sport')
-                child: Text(entry.value), // Display name (e.g., 'Sports')
-              );
-            }).toList(),
+items: _categories.entries.map((entry) {
+  return DropdownMenuItem<String>(
+    value: entry.key, // Raw enum value (e.g., 'sport')
+    child: Text(entry.value), // Display name (e.g., 'Sports')
+  );
+}).toList(),
               onChanged: (String? newValue) {
                 setState(() {
                   _selectedCategory = newValue;
