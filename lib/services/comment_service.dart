@@ -2,6 +2,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../db/SupabaseConfig.dart';
 import '../models/comment.dart';
 
+
 class CommentService {
   final _client = SupabaseConfig.client;
 
