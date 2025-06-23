@@ -6,7 +6,7 @@ class UserProfile {
   final String? bio;
   final String role;
   final DateTime createdAt;
- 
+
   UserProfile({
     required this.id,
     required this.email,

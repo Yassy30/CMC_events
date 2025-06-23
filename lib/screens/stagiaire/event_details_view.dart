@@ -250,6 +250,71 @@ class _EventDetailsViewState extends State<EventDetailsView> {
     }
   }
 
+  void _showCommentsDialog(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        final scrollController = ScrollController();
+        return Container(
+          height: MediaQuery.of(context).size.height * 0.75,
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            children: [
+              Container(
+                margin: const EdgeInsets.only(top: 10),
+                height: 5,
+                width: 40,
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Row(
+                  children: [
+                    const Text(
+                      'Comments',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const Spacer(),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(),
+              Expanded(
+                child: _EventDetailsCommentsSection(
+                  eventId: widget.event.id,
+                  controller: scrollController,
+                  onCommentAdded: () async {
+                    final newCount = await _commentService.getCommentsCount(widget.event.id);
+                    if (mounted) {
+                      setState(() {
+                        _commentsCount = newCount;
+                      });
+                    }
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -536,49 +601,49 @@ class _EventDetailsViewState extends State<EventDetailsView> {
                           side: BorderSide(color: Colors.grey[200]!),
                         ),
                         child: Padding(
-                          children: [
-                            Padding(
-                              padding: const EdgeInsets.all(16),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Event Stats',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                                 children: [
-                                  const Text(
-                                    'Event Stats',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 16,
-                                    ),
+                                  _buildStatColumn(
+                                    Icons.access_time,
+                                    DateFormat('HH:mm').format(widget.event.startDate),
+                                    'Start Time',
                                   ),
-                                  const SizedBox(height: 12),
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                                    children: [
-                                        _buildStatColumn(
-                                          Icons.access_time,
-                                        DateFormat('HH:mm').format(widget.event.startTime),
-                                      'Start Time',
-                                    ),
-                                    _buildStatColumn(
-                                      Icons.people,
-                                      '$_reservationsCount${widget.event.maxAttendees != null ? '/${widget.event.maxAttendees}' : ''}',
-                                      'Attendees',
-                                    ),
-                                    _buildStatColumn(
-                                      Icons.favorite,
-                                      '$_likesCount',
-                                      'Likes',
-                                    ),
-                                    _buildStatColumn(
+                                  _buildStatColumn(
+                                    Icons.people,
+                                    '$_reservationsCount${widget.event.maxAttendees != null ? '/${widget.event.maxAttendees}' : ''}',
+                                    'Attendees',
+                                  ),
+                                  _buildStatColumn(
+                                    Icons.favorite,
+                                    '$_likesCount',
+                                    'Likes',
+                                  ),
+                                  GestureDetector(
+                                    onTap: () => _showCommentsDialog(context),
+                                    child: _buildStatColumn(
                                       Icons.comment,
                                       '$_commentsCount',
                                       'Comments',
                                     ),
-                                  ],
-                                ),
-                              ],
-                            ),
+                                  ),
+                                ],
+                              ),
+                            ],
                           ),
-                        ],
+                        ),
                       ),
                       if (widget.event.maxAttendees != null) ...[
                         const SizedBox(height: 12),
@@ -639,43 +704,45 @@ class _EventDetailsViewState extends State<EventDetailsView> {
                                     value: widget.event.maxAttendees! > 0
                                         ? _reservationsCount / widget.event.maxAttendees!
                                         : 0,
-                                  backgroundColor: Colors.grey[200],
-                                  valueColor: AlwaysStoppedAnimation<Color>(
-                                    _reservationsCount >= widget.event.maxAttendees!
-                                        ? Colors.red
-                                        : theme.colorScheme.primary,
+                                    backgroundColor: Colors.grey[200],
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      _reservationsCount >= widget.event.maxAttendees!
+                                          ? Colors.red
+                                          : theme.colorScheme.primary,
+                                    ),
+                                    minHeight: 6,
                                   ),
-                                  minHeight: 6,
                                 ),
                               ],
                             ),
-                          ],
+                          ),
                         ),
                       ],
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              onPressed: _toggleLike,
-                              icon: Icon(
-                                _isLiked ? Icons.favorite : Icons.favorite_border,
-                                color: _isLiked ? Colors.red : Colors.grey[600],
-                                size: 18,
-                              ),
-                              label: Text(
-                                'Like ($_likesCount)',
-                                style: TextStyle(
-                                  color: Colors.grey[800],
+                      // Fix 3: Social interaction buttons
+                      Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                onPressed: _toggleLike,
+                                icon: Icon(
+                                  _isLiked ? Icons.favorite : Icons.favorite_border,
+                                  color: _isLiked ? Colors.red : Colors.grey[600],
+                                  size: 18,
                                 ),
-                              ),
-                              style: OutlinedButton.styleFrom(
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
+                                label: Text(
+                                  'Like ($_likesCount)',
+                                  style: TextStyle(
+                                    color: Colors.grey[800],
+                                  ),
                                 ),
-                                padding: const EdgeInsets.symmetric(vertical: 10),
+                                style: OutlinedButton.styleFrom(
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  padding: const EdgeInsets.symmetric(vertical: 10),
+                                ),
                               ),
                             ),
                             const SizedBox(width: 8),
@@ -700,10 +767,11 @@ class _EventDetailsViewState extends State<EventDetailsView> {
                                   padding: const EdgeInsets.symmetric(vertical: 10),
                                 ),
                               ),
-                            ],
-                          ),
-                        ],
+                            ),
+                          ],
+                        ),
                       ),
+                      // Modified Save button to take full row
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         child: OutlinedButton.icon(
@@ -726,6 +794,7 @@ class _EventDetailsViewState extends State<EventDetailsView> {
                             ),
                             padding: const EdgeInsets.symmetric(vertical: 10),
                             side: BorderSide(color: theme.colorScheme.primary),
+                            minimumSize: Size(double.infinity, 40), // Ensures full width
                           ),
                         ),
                       ),
@@ -863,71 +932,6 @@ class _EventDetailsViewState extends State<EventDetailsView> {
       ],
     );
   }
-
-  void _showCommentsDialog(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) {
-        final scrollController = ScrollController();
-        return Container(
-          height: MediaQuery.of(context).size.height * 0.75,
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-          ),
-          child: Column(
-            children: [
-              Container(
-                margin: const EdgeInsets.only(top: 10),
-                height: 5,
-                width: 40,
-                decoration: BoxDecoration(
-                  color: Colors.grey[300],
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Row(
-                  children: [
-                    const Text(
-                      'Comments',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const Spacer(),
-                    IconButton(
-                      icon: const Icon(Icons.close),
-                      onPressed: () => Navigator.pop(context),
-                    ),
-                  ],
-                ),
-              ),
-              const Divider(),
-              Expanded(
-                child: _EventDetailsCommentsSection(
-                  eventId: widget.event.id,
-                  controller: scrollController,
-                  onCommentAdded: () async {
-                    final newCount = await _eventService.getCommentsCount(widget.event.id);
-                    if (mounted) {
-                      setState(() {
-                        _commentsCount = newCount;
-                      });
-                    }
-                  },
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
 }
 
 class _EventDetailsCommentsSection extends StatefulWidget {
@@ -936,11 +940,10 @@ class _EventDetailsCommentsSection extends StatefulWidget {
   final VoidCallback? onCommentAdded;
 
   const _EventDetailsCommentsSection({
-    Key? key,
     required this.eventId,
     required this.controller,
     this.onCommentAdded,
-  }) : super(key: key);
+  });
 
   @override
   State<_EventDetailsCommentsSection> createState() => _EventDetailsCommentsSectionState();
@@ -981,26 +984,27 @@ class _EventDetailsCommentsSectionState extends State<_EventDetailsCommentsSecti
         });
       }
     } catch (e) {
-      print('Error loading comments: $e}');
       if (mounted) {
         setState(() {
-          _isLoading = false);
+          _isLoading = false;
         });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading comments: ${e.toString()}')),
+        );
       }
     }
   }
 
   Future<void> _sendComment() async {
-    if (_commentController.text.trim() == '') {
+    if (_commentController.text.trim().isEmpty) {
       return;
     }
 
-    if (!_authService.isLoggedIn()) {
-      ScaffoldMessenger.of(context: context).showSnackBar(
-        const SnackBar(content: Text('Please log in to comment')))
-        );
-        return;
-      }
+    if (!_authService.isLoggedIn) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please log in to comment')),
+      );
+      return;
     }
 
     setState(() {
@@ -1009,33 +1013,28 @@ class _EventDetailsCommentsSectionState extends State<_EventDetailsCommentsSecti
 
     try {
       final userId = _authService.currentUserId;
-      final comment = await _eventService.addComment(
+      final comment = await _commentService.addComment(
         widget.eventId,
         userId,
         _commentController.text.trim(),
       );
 
-      if (comment != null) {
-        if (mounted) {
-          setState(() {
-            _comments_comments.insert(0, comment);
-            _commentController.clear();
-          );
-            if (_widget.onCommentAdded != null) {
-              _widget.onCommentAdded();
-            }
-          }
-        };
-      } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to send comment: ${e.toString()}'))
-      );
+      if (comment != null && mounted) {
+        setState(() {
+          _comments.insert(0, comment);
+          _commentController.clear();
+        });
+        widget.onCommentAdded?.call();
       }
-      } finally {
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to comment: ${e.toString()}')),
+      );
+    } finally {
       if (mounted) {
         setState(() {
           _isSending = false;
-      });
+        });
       }
     }
   }
@@ -1045,199 +1044,151 @@ class _EventDetailsCommentsSectionState extends State<_EventDetailsCommentsSecti
     return Column(
       children: [
         Expanded(
-          child: _isLoading 
+          child: _isLoading
               ? const Center(child: CircularProgressIndicator())
-              : _isComments.isEmpty()
+              : _comments.isEmpty
                   ? Center(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                            Icon(
-                              Icons.chat_bubble,
-                                  style: Outlined,
-                              size: 48,
+                          Icon(
+                            Icons.chat_bubble_outline,
+                            size: 48,
+                            color: Colors.grey[400],
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'No comments yet',
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Be the first to comment!',
+                            style: TextStyle(
+                              fontSize: 14,
                               color: Colors.grey[400],
                             ),
-                            const SizedBox(height: 16),
-                            Text(
-                              'No comments yet',
-                              style: TextStyle(
-                                fontSize: 16,
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Be the first to comment!',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey[
-400],
-                                color: Colors.grey,
-                              ),
-                            ],
-                            ),
-                          ],
-                        ),
-                      )
-                  : ListView.separated(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                          controller: widget.controller,
-                            padding: const EdgeInsets.all(8),
-                          itemCount: _comments_comments.length(),
-                          separatorBuilder: (context, index) => Divider(height: 24),
-                          itemBuilder: (context, index) => {
-                            return _EventDetailsCommentTile(comment: _comments[index]),
-                          };
-                        },
-                      ),
-                    ),
-        SafeArea(
-              child: Container(
-                padding: const EdgeInsets.all(
-12),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  border: BoxDecoration(
-                    top: BorderSide(color: Colors.grey[200]!),
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(
-0.05),
-                      blurRadius: 5,
-                      offset: const Offset(0, -2),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  children: [
-                    CircleAvatar(
-                      child: [
-                        Icon(Icons.person,
-                            color: Colors.grey[500],
-                            size: Colors.grey),
-                      radius: 18,
-                      backgroundColor: Colors.grey[200],
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: [
-                        TextField(
-                          controller: _controllercommentController,
-                          decoration: InputDecoration(
-                            hintText: 'Add a comment...',
-                            hintStyle: TextStyle(color: Colors.grey[400]),
-                            border: OutlineInputBorderColors(
-                              borderRadius: BorderRadius.all(Radius.circular(24)),
-                              borderSide: BorderSide.none,
-                            ),
-                            filled: true,
-                            fillColor: Colors.grey[100],
-                            contentPadding: const EdgeInsets.symmetric(
-                              padding: EdgeInsets.symmetric(horizontal: horizontal,
-                              vertical: 16,
-                              vertical: 10),
-                            ),
-                            isDense: true,
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                        _isSending
-                            ? SizedBox(
-                              width: 36,
-                                height: 36,
-                                width: const EdgeInsets.all(8),
-                                child: margin: const EdgeInsets.all(8.0),
-                                child: Padding(
-                                  padding: const EdgeInsets.all(8),
-                                  child: CircularProgressIndicator(strokeWidth: 2),
-                                ),
-                              width: child,
-                            )
-                            : Container(
-                                width: 36,
-                                  height: 36,
-                                  width: BoxDecoration(
-                                    color: Theme.of(context).colorScheme.primary,
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: Icon(
-                                    shape: Icon(Icons.send, color: Colors.white, size: 16),
-                                    icon: onPressed: _sendComment,
-                                    padding: EdgeInsets.zero,
-                                  ),
-                                ),
-                          ],
-                        ),
-                        const SizedBox(width: 8),
-                      ],
+                        ],
+                      ),
+                    )
+                  : ListView.separated(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      controller: widget.controller,
+                      itemCount: _comments.length,
+                      separatorBuilder: (context, index) => const Divider(height: 24),
+                      itemBuilder: (context, index) => _EventDetailsCommentTile(comment: _comments[index]),
                     ),
-                  child: Row(
-                    children: [
-                      Container(
+        ),
+        SafeArea(
+          child: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              border: Border(top: BorderSide(color: Colors.grey[200]!)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 5,
+                  offset: const Offset(0, -2),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                CircleAvatar(
+                  radius: 18,
+                  backgroundColor: Colors.grey[200],
+                  child: Icon(Icons.person, color: Colors.grey[500], size: 20),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextField(
+                    controller: _commentController,
+                    decoration: InputDecoration(
+                      hintText: 'Add a comment...',
+                      hintStyle: TextStyle(color: Colors.grey[400]),
+                      border: const OutlineInputBorder(
+                        borderRadius: BorderRadius.all(Radius.circular(24)),
+                        borderSide: BorderSide.none,
+                      ),
+                      filled: true,
+                      fillColor: Colors.grey[100],
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 10,
+                      ),
+                      isDense: true,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                _isSending
+                    ? const SizedBox(
                         width: 36,
                         height: 36,
-                            height: 16,
-                            color: Colors.white,
-                            child: IconButton(
-                              onPressed: _sendComment,
-                              iconSize: 16,
-                                ),
-                            decoration: null,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.primary,
+                          shape: BoxShape.circle,
                         ),
-                      ],
-                  ),
-                ),
-              ),
+                        child: IconButton(
+                          onPressed: _sendComment,
+                          icon: const Icon(Icons.send, color: Colors.white, size: 16),
+                          padding: EdgeInsets.zero,
+                        ),
+                      ),
+              ],
             ),
-          ],
-      );
-    }
-
+          ),
+        ),
+      ],
+    );
   }
+}
 
 class _EventDetailsCommentTile extends StatelessWidget {
-  final Comment _comment;
+  final Comment comment;
 
   const _EventDetailsCommentTile({
     required this.comment,
-    Key? key,
-  }) : super(key);
+  });
 
   @override
   Widget build(BuildContext context) {
     String formattedTime;
     final now = DateTime.now();
-    final timeDifference = now.difference(widget.comment.createdAt);
-    
+    final difference = now.difference(comment.createdAt);
+
     if (difference.inSeconds < 60) {
       formattedTime = 'Just now';
-      } else if (difference.inMinutes < 60) {
-        formattedTime = '${difference.inMinutes}m ago';
-      } else if (difference.inHours < 24) {
+    } else if (difference.inMinutes < 60) {
+      formattedTime = '${difference.inMinutes}m ago';
+    } else if (difference.inHours < 24) {
       formattedTime = '${difference.inHours}h ago';
     } else if (difference.inDays < 7) {
       formattedTime = '${difference.inDays}d ago';
     } else {
-      formatTime = DateFormat('MMM d, yyyy').format(widget.comment.createdAt);
+      formattedTime = DateFormat('MMM d, yyyy').format(comment.createdAt);
     }
-    
+
     return Row(
-      mainAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         CircleAvatar(
-          child: widget.comment.userImageUrl != null
-              ? CircleAvatar(
-                  radius: 18,
-                  backgroundImage: NetworkImage(widget.comment.userImageUrl),
-              )
-              : null,
-          backgroundColor: Colors.grey[200],
           radius: 18,
-        child: widget.event.isEmpty
-            ? Icon(Icons.person, color: Colors.grey[600], size: 20)
-            : null,
+          backgroundImage: comment.userImageUrl != null ? NetworkImage(comment.userImageUrl!) : null,
+          backgroundColor: Colors.grey[200],
+          child: comment.userImageUrl == null
+              ? Icon(Icons.person, color: Colors.grey[600], size: 20)
+              : null,
         ),
         const SizedBox(width: 12),
         Expanded(
@@ -1247,10 +1198,11 @@ class _EventDetailsCommentTile extends StatelessWidget {
               Row(
                 children: [
                   Text(
-                    widget.comment.userName,
-                    style: TextStyle(
+                    comment.username,
+                    style: const TextStyle(
                       fontWeight: FontWeight.bold,
-                      fontSize: 14),
+                      fontSize: 14,
+                    ),
                   ),
                   const SizedBox(width: 8),
                   Text(
@@ -1261,29 +1213,30 @@ class _EventDetailsCommentTile extends StatelessWidget {
                     ),
                   ),
                 ],
-                ),
+              ),
               const SizedBox(height: 4),
               Text(
-                  widget.comment.text,
-                  style: TextStyle(
-                    fontSize: 14,
-                    height: 1.4,
-                  ),
+                comment.text,
+                style: const TextStyle(
+                  fontSize: 14,
+                  height: 1.4,
+                ),
+              ),
               const SizedBox(height: 8),
               Row(
                 children: [
-                    _buildCommentAction('Like'),
-                    const SizedBox(width: 16),
-                    _buildCommentAction('Reply'),
+                  _buildCommentAction('Like'),
+                  const SizedBox(width: 16),
+                  _buildCommentAction('Reply'),
                 ],
-                ),
+              ),
             ],
           ),
         ),
-      ),
+      ],
     );
   }
-  
+
   Widget _buildCommentAction(String text) {
     return Text(
       text,
@@ -1295,15 +1248,3 @@ class _EventDetailsCommentTile extends StatelessWidget {
     );
   }
 }
-
-// When navigating to EventDetailsView in your app, use:
-// Navigator.push(
-//   context,
-//   MaterialPageRoute(
-//     builder: (context) => EventDetailsView(
-//       event: event,
-//       controller: controller,
-//     ),
-//     settings: const RouteSettings(name: '/event_details'),
-//   ),
-// );

@@ -361,7 +361,7 @@ class SmallEventCard extends StatefulWidget {
 
   @override
   State<SmallEventCard> createState() => _SmallEventCardState();
-} 
+}
 
 class _SmallEventCardState extends State<SmallEventCard> {
   final _eventService = EventService();

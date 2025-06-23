@@ -1,12 +1,13 @@
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:cmc_ev/models/user.dart' as my_models;
+import 'package:image_picker/image_picker.dart';
 
 class EditProfileScreen extends StatefulWidget {
   final my_models.User user;
-  final Function(String, String, File?) onUpdate;
-  
+final Function(String, String, XFile?) onUpdate; // Ensure XFile? is used  
   const EditProfileScreen({
     super.key,
     required this.user,
@@ -20,7 +21,7 @@ class EditProfileScreen extends StatefulWidget {
 class _EditProfileScreenState extends State<EditProfileScreen> with SingleTickerProviderStateMixin {
   late TextEditingController _usernameController;
   late TextEditingController _bioController;
-  File? _image;
+  XFile? _image; // Change from File to XFile
   bool _isLoading = false;
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
@@ -47,7 +48,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> with SingleTicker
     final pickedFile = await picker.pickImage(source: ImageSource.gallery);
     if (pickedFile != null && mounted) {
       setState(() {
-        _image = File(pickedFile.path);
+        _image = pickedFile; // Store XFile
       });
     }
   }
@@ -68,7 +69,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> with SingleTicker
       final imageUploadSuccess = await widget.onUpdate(
         _usernameController.text,
         _bioController.text,
-        _image,
+        _image, // Pass XFile? directly
       );
 
       if (mounted) {
@@ -158,13 +159,33 @@ class _EditProfileScreenState extends State<EditProfileScreen> with SingleTicker
                         radius: 60,
                         backgroundColor: Colors.grey[300],
                         backgroundImage: _image != null
-                            ? FileImage(_image!)
+                            ? null
                             : (widget.user.profilePicture != null
                                 ? NetworkImage(widget.user.profilePicture!)
                                 : null) as ImageProvider<Object>?,
-                        child: _image == null && widget.user.profilePicture == null
-                            ? const Icon(Icons.person, size: 60, color: Colors.grey)
-                            : null,
+                        child: _image != null
+                            ? FutureBuilder<Uint8List>(
+                                future: _image!.readAsBytes(),
+                                builder: (context, snapshot) {
+                                  if (snapshot.connectionState == ConnectionState.done && snapshot.hasData) {
+                                    return ClipOval(
+                                      child: Image.memory(
+                                        snapshot.data!,
+                                        fit: BoxFit.cover,
+                                        width: 120,
+                                        height: 120,
+                                      ),
+                                    );
+                                  } else if (snapshot.hasError) {
+                                    return const Icon(Icons.error, size: 60, color: Colors.red);
+                                  } else {
+                                    return const Center(child: CircularProgressIndicator());
+                                  }
+                                },
+                              )
+                            : (_image == null && widget.user.profilePicture == null
+                                ? const Icon(Icons.person, size: 60, color: Colors.grey)
+                                : null),
                       ),
                       Positioned(
                         bottom: 0,

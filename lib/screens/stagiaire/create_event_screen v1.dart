@@ -7,10 +7,7 @@ import '../../services/event_service.dart';
 import '../../db/SupabaseConfig.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
-import 'dart:math';
-import 'dart:typed_data';
-import 'dart:ui' as ui;
-import 'package:flutter/rendering.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class CreateEventScreen extends StatefulWidget {
   const CreateEventScreen({super.key});
@@ -34,15 +31,9 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   String? _selectedCategory;
   final _eventService = EventService();
 
-  final List<String> _categories = [
-    'All Events',
-    'Art & Design',
-    'Sports',
-    'Gaming',
-    'Music',
-    'Tech',
-   
-  ];
+  final List<String> _categories = ['sport', 'culture', 'competition', 'other'];
+  final String huggingFaceApiToken =
+      dotenv.env['HF_API_TOKEN'] ?? 'default_token';
 
   @override
   void initState() {
@@ -62,30 +53,77 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   }
 
   Future<Map<String, String>> _generateText(String prompt) async {
+    final url =
+        Uri.parse('https://api-inference.huggingface.co/models/distilgpt2');
     try {
-      final List<String> adjectives = ['Exciting', 'Fun', 'Amazing', 'Thrilling', 'Unique'];
-      final List<String> eventTypes = ['Festival', 'Gathering', 'Show', 'Competition', 'Experience'];
-      final Random random = Random();
+      final response = await http.post(
+        url,
+        headers: {
+          'Authorization': 'Bearer $huggingFaceApiToken',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'inputs':
+              'Generate a title and description for an event based on this prompt: $prompt',
+          'parameters': {'max_length': 100},
+        }),
+      );
 
-      String title = prompt.trim();
-      if (title.isEmpty) {
-        title = '${adjectives[random.nextInt(adjectives.length)]} ${eventTypes[random.nextInt(eventTypes.length)]}';
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        String generatedText = data[0]['generated_text'];
+        List<String> parts = generatedText.split('\n');
+        String title = parts.length > 0 ? parts[0].trim() : 'Generated Event';
+        String description =
+            parts.length > 1 ? parts[1].trim() : 'No description generated';
+        return {'title': title, 'description': description};
       } else {
-        title = title.split(' ').map((word) => word.isNotEmpty ? '${word[0].toUpperCase()}${word.substring(1).toLowerCase()}' : '').join(' ');
-        title = '${adjectives[random.nextInt(adjectives.length)]} $title ${eventTypes[random.nextInt(eventTypes.length)]}';
+        print('Text generation failed: ${response.statusCode}');
+        return {'title': '', 'description': ''};
       }
-
-      String description = 'Join us for an ${adjectives[random.nextInt(adjectives.length)].toLowerCase()} event! ';
-      if (prompt.isNotEmpty) {
-        description += 'This event focuses on $prompt, offering a ${adjectives[random.nextInt(adjectives.length)].toLowerCase()} time for all. ';
-      }
-      description += 'Expect ${['live music', 'fun activities', 'great food', 'exciting games', 'special performances'][random.nextInt(5)]} ';
-      description += 'on ${DateTime.now().toString().split(' ')[0]} at a location near you. Don’t miss out!';
-
-      return {'title': title, 'description': description};
     } catch (e) {
       print('Error generating text: $e');
-      return {'title': 'Generated Event', 'description': 'No description generated'};
+      return {'title': '', 'description': ''};
+    }
+  }
+
+  Future<String?> _generateImage(String prompt) async {
+    final url = Uri.parse(
+        'https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-2-1');
+    try {
+      final response = await http.post(
+        url,
+        headers: {
+          'Authorization': 'Bearer $huggingFaceApiToken',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'inputs': prompt,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final fileName = 'event_${DateTime.now().millisecondsSinceEpoch}.png';
+        final storageResponse = await SupabaseConfig.client.storage
+            .from('eventimages')
+            .uploadBinary(fileName, response.bodyBytes);
+
+        if (storageResponse.isNotEmpty) {
+          final imageUrl = SupabaseConfig.client.storage
+              .from('eventimages')
+              .getPublicUrl(fileName);
+          return imageUrl;
+        } else {
+          print('Failed to upload image to Supabase');
+          return null;
+        }
+      } else {
+        print('Image generation failed: ${response.statusCode}');
+        return null;
+      }
+    } catch (e) {
+      print('Error generating image: $e');
+      return null;
     }
   }
 
@@ -93,14 +131,14 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Générateur IA (100% Free)'),
+        title: const Text('Générateur IA'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             TextField(
               controller: _promptController,
               decoration: const InputDecoration(
-                labelText: 'Enter a prompt for event generation',
+                labelText: 'Description pour la génération',
               ),
               maxLines: 3,
             ),
@@ -111,7 +149,8 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                 onPressed: () async {
                   if (_promptController.text.isEmpty) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Please enter a prompt')),
+                      const SnackBar(
+                          content: Text('Veuillez entrer une description')),
                     );
                     return;
                   }
@@ -119,31 +158,38 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                   showDialog(
                     context: context,
                     barrierDismissible: false,
-                    builder: (context) => const Center(child: CircularProgressIndicator()),
+                    builder: (context) =>
+                        const Center(child: CircularProgressIndicator()),
                   );
 
-                  final textResult = await _generateText(_promptController.text);
+                  final textResult =
+                      await _generateText(_promptController.text);
+                  final imageUrl = await _generateImage(_promptController.text);
 
                   Navigator.pop(context);
 
                   setState(() {
                     _titleController.text = textResult['title']!;
                     _descriptionController.text = textResult['description']!;
+                    _imageUrl = imageUrl;
                   });
 
                   Navigator.pop(context);
 
-                  if (textResult['title']!.isNotEmpty) {
+                  if (textResult['title']!.isNotEmpty && imageUrl != null) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Text generated successfully!')),
+                      const SnackBar(
+                          content: Text('Contenu généré avec succès !')),
                     );
                   } else {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Error generating text')),
+                      const SnackBar(
+                          content:
+                              Text('Erreur lors de la génération du contenu')),
                     );
                   }
                 },
-                child: const Text('Generate Text'),
+                child: const Text('Générer'),
               ),
             ),
           ],
@@ -171,19 +217,6 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     return null;
   }
 
-  String _mapDisplayCategoryToDatabase(String displayCategory) {
-    // Map from display categories to database categories
-    final Map<String, String> categoryMap = {
-      'All Events': 'other',
-      'Art & Design': 'art_design',
-      'Sports': 'sport',
-      'Competition': 'competition',
-      'Culture': 'culture',
-    };
-    
-    return categoryMap[displayCategory] ?? 'other';
-  }
-
   Future<void> _createEvent() async {
     if (!_formKey.currentState!.validate()) return;
     if (_selectedDate == null || _selectedTime == null) {
@@ -202,7 +235,8 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     final creatorId = await _fetchFirstUserId();
     if (creatorId == null || creatorId.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No users found. Please create a user first.')),
+        const SnackBar(
+            content: Text('No users found. Please create a user first.')),
       );
       return;
     }
@@ -219,30 +253,38 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
       double? ticketPrice;
       String paymentType = 'free';
       if (!_isFree) {
-        print('Price text before parsing: "${_priceController.text}"');
-        final priceText = _priceController.text.trim();
+        print(
+            'Price text before parsing: "${_priceController.text}"'); // Debug print
+        final priceText =
+            _priceController.text.trim(); // Remove leading/trailing spaces
         ticketPrice = double.tryParse(priceText);
         if (ticketPrice == null || ticketPrice <= 0) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Invalid ticket price. Please enter a valid positive number.')),
+            const SnackBar(
+                content: Text(
+                    'Invalid ticket price. Please enter a valid positive number.')),
           );
           return;
         }
         paymentType = 'paid';
       }
 
-      print('Creating event with creatorId: $creatorId, paymentType: $paymentType, ticketPrice: $ticketPrice');
+      print(
+          'Creating event with creatorId: $creatorId, paymentType: $paymentType, ticketPrice: $ticketPrice');
+      if(ticketPrice == null) {
+        print('Ticket price is: $ticketPrice');
+      } else {
       await _eventService.createEvent(
         title: _titleController.text,
         description: _descriptionController.text,
         creatorId: creatorId,
         startDate: startDate,
         location: _locationController.text,
-        category: _mapDisplayCategoryToDatabase(_selectedCategory!),
+        category: _selectedCategory!,
         paymentType: paymentType,
         ticketPrice: ticketPrice,
         maxAttendees: int.tryParse(_maxAttendeesController.text),
-        imageUrl: _imageUrl ?? 'https://via.placeholder.com/150',
+        imageUrl: _imageUrl ?? 'https://placeholder.com/event-image.jpg',
       );
 
       if (mounted) {
@@ -253,7 +295,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
           context,
           MaterialPageRoute(builder: (_) => const MainNavigation()),
         );
-      }
+      }}
     } catch (e) {
       if (mounted) {
         print('Failed to create event: $e');
@@ -270,21 +312,9 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
       appBar: AppBar(
         title: const Text('Créer un événement'),
       ),
-      floatingActionButton: Column(
-        mainAxisAlignment: MainAxisAlignment.end,
-        children: [
-          FloatingActionButton(
-            onPressed: _showAIGeneratorDialog,
-            child: const Icon(Icons.text_fields),
-            heroTag: 'textGenerator',
-          ),
-          const SizedBox(height: 10),
-          FloatingActionButton(
-            onPressed: _showImageChoiceDialog,
-            child: const Icon(Icons.image),
-            heroTag: 'imageChoice',
-          ),
-        ],
+      floatingActionButton: FloatingActionButton(
+        onPressed: _showAIGeneratorDialog,
+        child: const Icon(Icons.auto_awesome),
       ),
       body: Form(
         key: _formKey,
@@ -293,8 +323,6 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
           children: [
             _ImagePicker(
               onImageSelected: (url) => setState(() => _imageUrl = url),
-              descriptionController: _descriptionController,
-              promptController: _promptController,
             ),
             const SizedBox(height: 16),
             TextFormField(
@@ -335,7 +363,8 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
               items: _categories.map((String category) {
                 return DropdownMenuItem<String>(
                   value: category,
-                  child: Text(category[0].toUpperCase() + category.substring(1)),
+                  child:
+                      Text(category[0].toUpperCase() + category.substring(1)),
                 );
               }).toList(),
               onChanged: (String? newValue) {
@@ -459,7 +488,8 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                   border: OutlineInputBorder(),
                   prefixIcon: Icon(Icons.euro),
                 ),
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
                 validator: (value) {
                   if (!_isFree) {
                     if (value == null || value.isEmpty) {
@@ -483,56 +513,59 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
       ),
     );
   }
+}
 
-  void _showImageChoiceDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Choose Image Option'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.image),
-              title: const Text('Upload Image'),
-              onTap: () {
-                Navigator.pop(context);
-                _showImageSourceActionSheet();
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.auto_awesome),
-              title: const Text('Generate Image'),
-              onTap: () {
-                Navigator.pop(context);
-                // Handled in _ImagePickerState
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+class _ImagePicker extends StatefulWidget {
+  final Function(String)? onImageSelected;
+
+  const _ImagePicker({this.onImageSelected});
+
+  @override
+  State<_ImagePicker> createState() => _ImagePickerState();
+}
+
+class _ImagePickerState extends State<_ImagePicker> {
+  final ImagePicker _picker = ImagePicker();
+  String? _uploadedImageUrl;
+  bool _isUploading = false;
 
   Future<void> _pickAndUploadImage(ImageSource source) async {
     try {
-      final XFile? image = await ImagePicker().pickImage(source: source);
+      final XFile? image = await _picker.pickImage(source: source);
       if (image == null) return;
 
-      final fileName = 'event_${DateTime.now().millisecondsSinceEpoch}.png';
-      final path = 'public/$fileName';
-      final File imageFile = File(image.path);
+      setState(() => _isUploading = true);
 
-      await SupabaseConfig.client.storage.from('eventimages').upload(path, imageFile);
-      final imageUrl = SupabaseConfig.client.storage.from('eventimages').getPublicUrl(path);
-      setState(() => _imageUrl = imageUrl);
+      final File imageFile = File(image.path);
+      final String fileName =
+          'event_${DateTime.now().millisecondsSinceEpoch}.png';
+
+      // Upload to a specific folder
+      final String path = 'public/$fileName';
+
+      final response = await SupabaseConfig.client.storage
+          .from('eventimages')
+          .upload(path, imageFile);
+
+      // Get public URL from just the path used (not full response)
+      final String publicUrl =
+          SupabaseConfig.client.storage.from('eventimages').getPublicUrl(path);
+
+      setState(() {
+        _uploadedImageUrl = publicUrl;
+        _isUploading = false;
+      });
+
+      widget.onImageSelected?.call(publicUrl);
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Image uploaded successfully')),
       );
     } catch (e) {
+      setState(() => _isUploading = false);
       print('Error picking/uploading image: $e');
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to pick or upload image.')),
+        SnackBar(content: Text('Failed to pick or upload image.')),
       );
     }
   }
@@ -564,118 +597,11 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
       ),
     );
   }
-}
-
-class _ImagePicker extends StatefulWidget {
-  final Function(String)? onImageSelected;
-  final TextEditingController descriptionController;
-  final TextEditingController promptController;
-
-  const _ImagePicker({
-    this.onImageSelected,
-    required this.descriptionController,
-    required this.promptController,
-  });
-
-  @override
-  State<_ImagePicker> createState() => _ImagePickerState();
-}
-
-class _ImagePickerState extends State<_ImagePicker> {
-  final ImagePicker _picker = ImagePicker();
-  String? _uploadedImageUrl;
-  bool _isUploading = false;
-
-  Future<ui.Image> _generatePlaceholderImage(String text) async {
-    final recorder = ui.PictureRecorder();
-    final canvas = Canvas(recorder);
-    const size = Size(400, 200);
-
-    // Draw a random background color
-    final Random random = Random();
-    final color = Color.fromRGBO(
-      random.nextInt(256),
-      random.nextInt(256),
-      random.nextInt(256),
-      1.0,
-    );
-    canvas.drawRect(
-      Rect.fromLTWH(0, 0, size.width, size.height),
-      Paint()..color = color,
-    );
-
-    // Draw text
-    final textPainter = TextPainter(
-      text: TextSpan(
-        text: text.length > 20 ? '${text.substring(0, 20)}...' : text,
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 20,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
-      textDirection: TextDirection.ltr,
-    );
-    textPainter.layout(minWidth: 0, maxWidth: size.width);
-    textPainter.paint(
-      canvas,
-      const Offset(10, 10),
-    );
-
-    final picture = recorder.endRecording();
-    final img = await picture.toImage(size.width.toInt(), size.height.toInt());
-    return img;
-  }
-
-  Future<void> _generateAndUploadImage() async {
-    final description = widget.descriptionController.text.isNotEmpty
-        ? widget.descriptionController.text
-        : widget.promptController.text.isNotEmpty
-            ? widget.promptController.text
-            : 'Event Image';
-
-    setState(() => _isUploading = true);
-
-    try {
-      // Generate the placeholder image
-      final image = await _generatePlaceholderImage(description);
-
-      // Convert ui.Image to byte data
-      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
-      if (byteData == null) throw Exception('Failed to convert image to bytes');
-      final imageBytes = byteData.buffer.asUint8List();
-
-      // Upload to Supabase
-      final fileName = 'generated_event_${DateTime.now().millisecondsSinceEpoch}.png';
-      final path = 'public/$fileName';
-      await SupabaseConfig.client.storage.from('eventimages').uploadBinary(path, imageBytes);
-
-      // Get the public URL
-      final imageUrl = SupabaseConfig.client.storage.from('eventimages').getPublicUrl(path);
-
-      setState(() {
-        _uploadedImageUrl = imageUrl;
-        _isUploading = false;
-      });
-
-      widget.onImageSelected?.call(imageUrl);
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Image generated and uploaded successfully')),
-      );
-    } catch (e) {
-      setState(() => _isUploading = false);
-      print('Error generating/uploading image: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to generate or upload image.')),
-      );
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: () => _showImageChoiceDialog(context),
+      onTap: _showImageSourceActionSheet,
       child: Container(
         height: 200,
         width: double.infinity,
@@ -690,7 +616,8 @@ class _ImagePickerState extends State<_ImagePicker> {
                     _uploadedImageUrl!,
                     fit: BoxFit.cover,
                     errorBuilder: (context, error, stackTrace) => const Center(
-                      child: Icon(Icons.error_outline, size: 50, color: Colors.red),
+                      child: Icon(Icons.error_outline,
+                          size: 50, color: Colors.red),
                     ),
                   )
                 : const Center(
@@ -698,99 +625,5 @@ class _ImagePickerState extends State<_ImagePicker> {
                   ),
       ),
     );
-  }
-
-  void _showImageChoiceDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Choose Image Option'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.image),
-              title: const Text('Upload Image'),
-              onTap: () {
-                Navigator.pop(context);
-                _showImageSourceActionSheet(context);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.auto_awesome),
-              title: const Text('Generate Image'),
-              onTap: () {
-                Navigator.pop(context);
-                _generateAndUploadImage();
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showImageSourceActionSheet(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      builder: (_) => SafeArea(
-        child: Wrap(
-          children: [
-            ListTile(
-              leading: const Icon(Icons.photo_library),
-              title: const Text('Gallery'),
-              onTap: () {
-                Navigator.of(context).pop();
-                _pickAndUploadImage(ImageSource.gallery);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.camera_alt),
-              title: const Text('Camera'),
-              onTap: () {
-                Navigator.of(context).pop();
-                _pickAndUploadImage(ImageSource.camera);
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Future<void> _pickAndUploadImage(ImageSource source) async {
-    try {
-      final XFile? image = await _picker.pickImage(source: source);
-      if (image == null) return;
-
-      setState(() => _isUploading = true);
-
-      final File imageFile = File(image.path);
-      final String fileName = 'event_${DateTime.now().millisecondsSinceEpoch}.png';
-      final String path = 'public/$fileName';
-
-      await SupabaseConfig.client.storage.from('eventimages').upload(path, imageFile);
-
-      final String publicUrl = SupabaseConfig.client.storage
-          .from('eventimages')
-          .getPublicUrl(path);
-
-      setState(() {
-        _uploadedImageUrl = publicUrl;
-        _isUploading = false;
-      });
-
-      widget.onImageSelected?.call(publicUrl);
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Image uploaded successfully')),
-      );
-    } catch (e) {
-      setState(() => _isUploading = false);
-      print('Error picking/uploading image: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to pick or upload image.')),
-      );
-    }
   }
 }

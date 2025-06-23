@@ -1,6 +1,7 @@
-import 'dart:io';
+import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:cmc_ev/models/user.dart' as local_user;
+import 'dart:io' if (dart.library.html) 'dart:html'; // Conditional import for web
 
 class ProfileService {
   final SupabaseClient _supabase = Supabase.instance.client;
@@ -20,11 +21,11 @@ class ProfileService {
     }
   }
 
-  Future<bool> updateProfile(
+Future<bool> updateProfile(
     String userId,
     String username,
     String bio, {
-    File? image,
+    XFile? image,
   }) async {
     try {
       if (username.isEmpty) {
@@ -38,22 +39,53 @@ class ProfileService {
       };
 
       bool imageUploadSuccess = true;
+
       if (image != null) {
-        if (!await image.exists()) {
-          throw Exception('Le fichier image n\'existe pas');
-        }
-        final imagePath = '$userId/${DateTime.now().millisecondsSinceEpoch}.jpg';
         try {
-          await _supabase.storage.from(_bucketName).upload(
+          // Debug: Log XFile properties
+          print('Image name: ${image.name}, Size: ${await image.length()}');
+
+          // Read bytes from XFile
+          final bytes = await image.readAsBytes();
+
+          // Determine file extension
+          String extension = '';
+          if (image.name.contains('.')) {
+            extension = image.name.split('.').last.toLowerCase();
+          } else {
+            // Fallback: Try to infer from MIME type
+            final mimeType = image.mimeType ?? 'image/jpeg'; // Default to jpeg if unknown
+            extension = mimeType.split('/').last.toLowerCase();
+          }
+
+          // Support more formats
+          const supportedFormats = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'heic', 'heif'];
+          if (!supportedFormats.contains(extension)) {
+            throw Exception('Format d\'image non supporté : $extension');
+          }
+
+          // Ensure valid content type
+          final contentType = extension == 'heic' || extension == 'heif'
+              ? 'image/heic' // HEIC/HEIF may need special handling
+              : 'image/$extension';
+
+          final imagePath = '$userId/${DateTime.now().millisecondsSinceEpoch}.$extension';
+
+          await _supabase.storage.from(_bucketName).uploadBinary(
                 imagePath,
-                image,
-                fileOptions: const FileOptions(upsert: true),
+                bytes,
+                fileOptions: FileOptions(
+                  upsert: true,
+                  contentType: contentType,
+                ),
               );
+
           final imageUrl = _supabase.storage.from(_bucketName).getPublicUrl(imagePath);
           updates['profile_picture'] = imageUrl;
         } catch (e) {
           imageUploadSuccess = false;
           print('Erreur lors du téléchargement de l\'image : $e');
+          // Continue with profile update even if image upload fails
         }
       }
 

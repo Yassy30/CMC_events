@@ -2,28 +2,27 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../db/SupabaseConfig.dart';
 import '../models/comment.dart';
 
-
 class CommentService {
   final _client = SupabaseConfig.client;
 
   Future<List<Comment>> getCommentsForEvent(String eventId) async {
     try {
       final response = await _client
-          .from('Comment')
-          .select('*, User!Comment_user_id_fkey(username, profile_picture)')
+          .from('comments')
+          .select('*, users(username, profile_picture)')
           .eq('event_id', eventId)
           .order('created_at', ascending: false);
 
       return response.map<Comment>((data) {
-        final userData = data['User'] as Map<String, dynamic>? ?? {};
+        final userData = data['users'] as Map<String, dynamic>;
         return Comment(
-          id: data['id'] as String,
-          eventId: data['event_id'] as String,
-          userId: data['user_id'] as String,
-          text: data['content'] as String,
-          createdAt: DateTime.parse(data['created_at'] as String),
-          username: userData['username'] as String? ?? 'Unknown',
-          userImageUrl: userData['profile_picture'] as String?,
+          id: data['id'],
+          eventId: data['event_id'],
+          userId: data['user_id'],
+          text: data['content'],
+          createdAt: DateTime.parse(data['created_at']),
+          username: userData['username'],
+          userImageUrl: userData['profile_picture'],
         );
       }).toList();
     } catch (e) {
@@ -32,8 +31,7 @@ class CommentService {
     }
   }
 
-  Future<Comment?> addComment(
-      String eventId, String userId, String text) async {
+  Future<Comment?> addComment(String eventId, String userId, String text) async {
     try {
       final timestamp = DateTime.now().toIso8601String();
       final newComment = {
@@ -44,20 +42,20 @@ class CommentService {
       };
 
       final response = await _client
-          .from('Comment')
+          .from('comments')
           .insert(newComment)
-          .select('*, User!Comment_user_id_fkey(username, profile_picture)')
+          .select('*, users(username, profile_picture)')
           .single();
 
-      final userData = response['User'] as Map<String, dynamic>? ?? {};
+      final userData = response['users'] as Map<String, dynamic>;
       return Comment(
-        id: response['id'] as String,
-        eventId: response['event_id'] as String,
-        userId: response['user_id'] as String,
-        text: response['content'] as String,
-        createdAt: DateTime.parse(response['created_at'] as String),
-        username: userData['username'] as String? ?? 'Unknown',
-        userImageUrl: userData['profile_picture'] as String?,
+        id: response['id'],
+        eventId: response['event_id'],
+        userId: response['user_id'],
+        text: response['content'],
+        createdAt: DateTime.parse(response['created_at']),
+        username: userData['username'],
+        userImageUrl: userData['profile_picture'],
       );
     } catch (e) {
       print('Error adding comment: $e');

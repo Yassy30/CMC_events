@@ -1,9 +1,4 @@
-import 'package:cmc_ev/db/SupabaseConfig.dart';
-import 'package:cmc_ev/models/event.dart';
-import 'package:cmc_ev/services/event_service.dart';
 import 'package:flutter/material.dart';
-import '../../services/report_service.dart';
-import '../../models/report.dart';
 
 class AdminDashboard extends StatelessWidget {
   const AdminDashboard({super.key});
@@ -35,54 +30,15 @@ class AdminDashboard extends StatelessWidget {
   }
 }
 
-class _EventsTab extends StatefulWidget {
-  @override
-  _EventsTabState createState() => _EventsTabState();
-}
-
-class _EventsTabState extends State<_EventsTab> {
-  final EventService _eventService = EventService();
-  List<Event> _events = [];
-  bool _isLoading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadEvents();
-  }
-
-  Future<void> _loadEvents() async {
-    try {
-      final events = await _eventService.getEvents();
-      if (mounted) {
-        setState(() {
-          _events = events;
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      print('Error loading events: $e');
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
-    }
-  }
-
+class _EventsTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
     return ListView.builder(
-      itemCount: _events.length,
+      itemCount: 10,
       itemBuilder: (context, index) {
-        final event = _events[index];
         return ListTile(
-          title: Text(event.title),
-          subtitle: Text('Organisateur: ${event.creatorName ?? "Inconnu"}'),
+          title: Text('Événement ${index + 1}'),
+          subtitle: const Text('Organisateur: John Doe'),
           trailing: PopupMenuButton(
             itemBuilder: (context) => [
               const PopupMenuItem(
@@ -104,38 +60,12 @@ class _EventsTabState extends State<_EventsTab> {
   }
 }
 
-class _ComplaintsTab extends StatefulWidget {
-  @override
-  _ComplaintsTabState createState() => _ComplaintsTabState();
-}
-
-class _ComplaintsTabState extends State<_ComplaintsTab> {
-  bool _isLoading = false;
-  final List<Map<String, String>> _mockReports = [
-    {
-      'id': '1',
-      'reason': 'Contenu inapproprié dans la description de l\'événement',
-    },
-    {
-      'id': '2',
-      'reason': 'L\'événement ne correspond pas à la catégorie indiquée',
-    },
-    {
-      'id': '3',
-      'reason': 'Informations trompeuses sur le lieu de l\'événement',
-    },
-  ];
-
+class _ComplaintsTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
     return ListView.builder(
-      itemCount: _mockReports.length,
+      itemCount: 5,
       itemBuilder: (context, index) {
-        final report = _mockReports[index];
         return Card(
           margin: const EdgeInsets.all(8.0),
           child: Padding(
@@ -148,7 +78,7 @@ class _ComplaintsTabState extends State<_ComplaintsTab> {
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
                 const SizedBox(height: 8),
-                Text(report['reason']!),
+                const Text('Description de la réclamation...'),
                 const SizedBox(height: 16),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.end,
@@ -173,83 +103,31 @@ class _ComplaintsTabState extends State<_ComplaintsTab> {
   }
 }
 
-class _StatisticsTab extends StatefulWidget {
-  @override
-  _StatisticsTabState createState() => _StatisticsTabState();
-}
-
-class _StatisticsTabState extends State<_StatisticsTab> {
-  final _client = SupabaseConfig.client;
-  bool _isLoading = true;
-  Map<String, int> _stats = {
-    'events': 0,
-    'users': 0,
-    'reservations': 0,
-    'reports': 0,
-  };
-
-  @override
-  void initState() {
-    super.initState();
-    _loadStats();
-  }
-
-  Future<void> _loadStats() async {
-    try {
-      final events = await _client.from('events').count();
-      final users = await _client.from('users').count();
-      final reservations = await _client.from('reservations').count();
-      final reports = await _client.from('reports').count();
-
-      if (mounted) {
-        setState(() {
-          _stats = {
-            'events': events,
-            'users': users,
-            'reservations': reservations,
-            'reports': reports,
-          };
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      print('Error loading statistics: $e');
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
-    }
-  }
-
+class _StatisticsTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
     return GridView.count(
       crossAxisCount: 2,
       padding: const EdgeInsets.all(16.0),
       children: [
         _StatCard(
           title: 'Événements',
-          value: _stats['events'].toString(),
+          value: '156',
           icon: Icons.event,
         ),
         _StatCard(
           title: 'Utilisateurs',
-          value: _stats['users'].toString(),
+          value: '1,234',
           icon: Icons.people,
         ),
         _StatCard(
           title: 'Réservations',
-          value: _stats['reservations'].toString(),
+          value: '892',
           icon: Icons.confirmation_number,
         ),
         _StatCard(
           title: 'Réclamations',
-          value: _stats['reports'].toString(),
+          value: '23',
           icon: Icons.warning,
         ),
       ],

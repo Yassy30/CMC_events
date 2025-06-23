@@ -6,7 +6,7 @@ import 'package:cmc_ev/services/profile_service.dart';
 import 'package:cmc_ev/models/user.dart' as my_models;
 import 'package:share_plus/share_plus.dart';
 import 'edit_profile_screen.dart';
-import 'package:cmc_ev/screens/stagiaire/profil/share_profil.dart';
+import 'package:cmc_ev/screens/stagiaire/profil/share_profile.dart';
 import 'package:cmc_ev/screens/stagiaire/event_details_view.dart';
 import 'package:cmc_ev/models/event.dart';
 import 'package:intl/intl.dart';
@@ -139,7 +139,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
           user!.id,
           username,
           bio,
-          image: image,
+          image: image != null ? XFile(image.path) : null,
         );
         
         if (mounted) {
@@ -200,7 +200,13 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
         MaterialPageRoute(
           builder: (context) => EditProfileScreen(
             user: user!,
-            onUpdate: _updateProfile,
+            onUpdate: (String username, String bio, XFile? image) {
+              return _updateProfile(
+                username,
+                bio,
+                image != null ? File(image.path) : null,
+              );
+            },
           ),
         ),
       );
