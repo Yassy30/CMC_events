@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:cmc_ev/services/auth_service.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -34,15 +35,18 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   String? _selectedCategory;
   final _eventService = EventService();
 
-  final List<String> _categories = [
-    'All Events',
-    'Art & Design',
-    'Sports',
-    'Gaming',
-    'Music',
-    'Tech',
-   
-  ];
+final Map<String, String> _categories = {
+  'culture': 'Art & Design',
+  'sport': 'Sports',
+  'competition': 'Gaming',
+  'music': 'Music',
+  'tech': 'Tech',
+  'other': 'Other',
+};
+
+String _formatCategoryDisplay(String category) {
+  return _categories[category] ?? (category[0].toUpperCase() + category.substring(1));
+}
 
   @override
   void initState() {
@@ -152,33 +156,35 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     );
   }
 
-  Future<String?> _fetchFirstUserId() async {
-    try {
-      final response = await SupabaseConfig.client
-          .from('users')
-          .select('id')
-          .limit(1)
-          .maybeSingle();
+  // Future<String?> _fetchFirstUserId() async {
+  //   try {
+  //     final response = await SupabaseConfig.client
+  //         .from('users')
+  //         .select('id')
+  //         .limit(1)
+  //         .maybeSingle();
 
-      if (response != null && response['id'] != null) {
-        print("the user id : ${response['id'] as String}");
-        return response['id'] as String;
-      }
-      print('No users found in the database.');
-    } catch (e) {
-      print('Error fetching first user: $e');
-    }
-    return null;
-  }
+  //     if (response != null && response['id'] != null) {
+  //       print("the user id : ${response['id'] as String}");
+  //       return response['id'] as String;
+  //     }
+  //     print('No users found in the database.');
+  //   } catch (e) {
+  //     print('Error fetching first user: $e');
+  //   }
+  //   return null;
+  // }
 
   String _mapDisplayCategoryToDatabase(String displayCategory) {
     // Map from display categories to database categories
     final Map<String, String> categoryMap = {
       'All Events': 'other',
-      'Art & Design': 'art_design',
+      'Art & Design': 'culture',
       'Sports': 'sport',
-      'Competition': 'competition',
-      'Culture': 'culture',
+      'Gaming': 'competition',
+      'Music': 'music',
+      'Tech': 'tech',
+      'Other': 'other',
     };
     
     return categoryMap[displayCategory] ?? 'other';
@@ -199,13 +205,14 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
       return;
     }
 
-    final creatorId = await _fetchFirstUserId();
-    if (creatorId == null || creatorId.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No users found. Please create a user first.')),
-      );
-      return;
-    }
+    final authService = AuthService();
+final creatorId = authService.currentUserId;
+if (creatorId.isEmpty) {
+  ScaffoldMessenger.of(context).showSnackBar(
+    const SnackBar(content: Text('User must be logged in to create an event.')),
+  );
+  return;
+}
 
     try {
       final startDate = DateTime(
@@ -269,7 +276,6 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Créer un événement'),
-        automaticallyImplyLeading: false,
       ),
       floatingActionButton: Column(
         mainAxisAlignment: MainAxisAlignment.end,
@@ -333,18 +339,12 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                 labelText: 'Catégorie',
                 border: OutlineInputBorder(),
               ),
-items: _categories.map((category) {
+items: _categories.entries.map((entry) {
   return DropdownMenuItem<String>(
-    value: category,
-    child: Text(category),
+    value: entry.key, // Raw enum value (e.g., 'sport')
+    child: Text(entry.value), // Display name (e.g., 'Sports')
   );
 }).toList(),
-            // items: _categories.entries.map((entry) {
-            //   return DropdownMenuItem<String>(
-            //     value: entry.key, // Raw enum value (e.g., 'sport')
-            //     child: Text(entry.value), // Display name (e.g., 'Sports')
-            //   );
-            // }).toList(),
               onChanged: (String? newValue) {
                 setState(() {
                   _selectedCategory = newValue;

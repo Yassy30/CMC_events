@@ -3,8 +3,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:cmc_ev/services/auth_service.dart';
 import 'package:cmc_ev/screens/stagiaire/provider/user_provider.dart';
 import 'package:provider/provider.dart';
-// Import the forgot password dialog
-import 'package:cmc_ev/screens/stagiaire/autho/forget_password_dialog.dart'; // Add this import
 
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key});
@@ -60,17 +58,6 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
     if (_formKey.currentState!.validate()) {
       setState(() => _isLoading = true);
       try {
-        // Code pour créer un compte admin
-        if (_emailController.text == 'yasminajabrouni@gmail.com' && 
-            _passwordController.text == '123456') {
-          final authService = AuthService();
-          await authService.signUp(
-            'yasminajabrouni@gmail.com',
-            '123456',
-            'yasmina',
-            role: 'admin'
-          );
-        }
         AuthResponse? response;
         if (_isLogin) {
           response = await _authService.signIn(
@@ -121,72 +108,65 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
     }
   }
 
-  // NEW: Method to show forgot password dialog
-  void _showForgotPasswordDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => const ForgotPasswordDialog(),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
-        color: Colors.white,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Theme.of(context).colorScheme.primary.withOpacity(0.1),
+              Theme.of(context).colorScheme.secondary.withOpacity(0.1),
+            ],
+          ),
+        ),
         child: SafeArea(
           child: Consumer<UserProvider>(
             builder: (context, userProvider, child) {
               return Center(
                 child: SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                  padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 32.0),
                   child: FadeTransition(
                     opacity: _fadeAnimation,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const SizedBox(height: 20),
-                        Text(
-                          'IN\'CMC',
-                          style: TextStyle(
-                            fontSize: 36,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.teal[400],
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                        Text(
-                          _isLogin ? 'Back for More?' : 'Join the Fun!',
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.black87,
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        Text(
-                          _isLogin
-                              ? 'Log in and explore what\'s happening around you.'
-                              : 'Create an account to discover and attend events near you.',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey[600],
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                        Form(
+                    child: Card(
+                      elevation: 8,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(24.0),
+                        child: Form(
                           key: _formKey,
                           child: Column(
+                            mainAxisSize: MainAxisSize.min,
                             children: [
+                              Text(
+                                'IN\'CMC',
+                                style: Theme.of(context).textTheme.headlineLarge?.copyWith(
+                                      fontWeight: FontWeight.bold,
+                                      color: Theme.of(context).colorScheme.primary,
+                                      fontSize: 36,
+                                    ),
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                _isLogin ? 'Connexion' : 'Inscription',
+                                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                                      color: Theme.of(context).colorScheme.onSurface,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                              ),
+                              const SizedBox(height: 24),
                               if (!_isLogin)
                                 _buildTextField(
                                   controller: _usernameController,
-                                  label: 'User name',
+                                  label: 'Nom d\'utilisateur',
                                   icon: Icons.person,
                                   validator: (value) {
                                     if (value == null || value.isEmpty) {
-                                      return 'Please enter a username';
+                                      return 'Veuillez entrer un nom d\'utilisateur';
                                     }
                                     return null;
                                   },
@@ -199,10 +179,10 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
                                 keyboardType: TextInputType.emailAddress,
                                 validator: (value) {
                                   if (value == null || value.isEmpty) {
-                                    return 'Please enter your email';
+                                    return 'Veuillez entrer votre email';
                                   }
                                   if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
-                                    return 'Please enter a valid email';
+                                    return 'Veuillez entrer un email valide';
                                   }
                                   return null;
                                 },
@@ -210,15 +190,15 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
                               const SizedBox(height: 16),
                               _buildTextField(
                                 controller: _passwordController,
-                                label: 'Password',
+                                label: 'Mot de passe',
                                 icon: Icons.lock,
                                 obscureText: true,
                                 validator: (value) {
                                   if (value == null || value.isEmpty) {
-                                    return 'Please enter your password';
+                                    return 'Veuillez entrer votre mot de passe';
                                   }
                                   if (value.length < 6) {
-                                    return 'Password must be at least 6 characters';
+                                    return 'Le mot de passe doit contenir au moins 6 caractères';
                                   }
                                   return null;
                                 },
@@ -227,38 +207,31 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
                                 const SizedBox(height: 16),
                                 _buildTextField(
                                   controller: _confirmPasswordController,
-                                  label: 'Confirm Password',
+                                  label: 'Confirmer le mot de passe',
                                   icon: Icons.lock,
                                   obscureText: true,
                                   validator: (value) {
                                     if (value == null || value.isEmpty) {
-                                      return 'Please confirm your password';
+                                      return 'Veuillez confirmer votre mot de passe';
                                     }
                                     if (value != _passwordController.text) {
-                                      return 'Passwords do not match';
+                                      return 'Les mots de passe ne correspondent pas';
                                     }
                                     return null;
                                   },
                                 ),
                               ],
-                              if (_isLogin)
-                                Align(
-                                  alignment: Alignment.centerRight,
-                                  child: TextButton(
-                                    onPressed: _showForgotPasswordDialog, // UPDATED: Now calls the dialog
-                                    child: const Text('Forget password?'),
-                                  ),
-                                ),
                               const SizedBox(height: 32),
                               ElevatedButton(
                                 onPressed: _isLoading ? null : _submit,
                                 style: ElevatedButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(horizontal: 80, vertical: 12),
+                                  padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 16),
                                   shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(20),
+                                    borderRadius: BorderRadius.circular(12),
                                   ),
-                                  backgroundColor: Colors.teal[400],
+                                  backgroundColor: Theme.of(context).colorScheme.primary,
                                   foregroundColor: Colors.white,
+                                  elevation: 4,
                                 ),
                                 child: _isLoading
                                     ? const SizedBox(
@@ -269,35 +242,12 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
                                         ),
                                       )
                                     : Text(
-                                        _isLogin ? 'Log In' : 'Sign Up',
+                                        _isLogin ? 'Connexion' : 'Inscription',
                                         style: const TextStyle(
                                           fontSize: 18,
                                           fontWeight: FontWeight.bold,
                                         ),
                                       ),
-                              ),
-                              const SizedBox(height: 16),
-                              Text(
-                                '- or with -',
-                                style: TextStyle(color: Colors.grey[600]),
-                              ),
-                              const SizedBox(height: 16),
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  IconButton(
-                                    icon: const Icon(Icons.facebook, color: Colors.blue),
-                                    onPressed: () {},
-                                  ),
-                                  IconButton(
-                                    icon: const Icon(Icons.g_mobiledata, color: Colors.red),
-                                    onPressed: () {},
-                                  ),
-                                  IconButton(
-                                    icon: const Icon(Icons.apple, color: Colors.black),
-                                    onPressed: () {},
-                                  ),
-                                ],
                               ),
                               const SizedBox(height: 16),
                               TextButton(
@@ -309,9 +259,9 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
                                   });
                                 },
                                 child: Text(
-                                  _isLogin ? 'You Don\'t have account? Sign Up' : 'Already have an account? Log In',
+                                  _isLogin ? 'Créer un compte ?' : 'Déjà un compte ? Se connecter',
                                   style: TextStyle(
-                                    color: Colors.teal[400],
+                                    color: Theme.of(context).colorScheme.primary,
                                     fontWeight: FontWeight.w600,
                                   ),
                                 ),
@@ -319,7 +269,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
                             ],
                           ),
                         ),
-                      ],
+                      ),
                     ),
                   ),
                 ),
@@ -343,14 +293,21 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
       controller: controller,
       decoration: InputDecoration(
         labelText: label,
-        prefixIcon: Icon(icon, color: Colors.teal[400]),
+        prefixIcon: Icon(icon, color: Theme.of(context).colorScheme.primary),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide.none,
         ),
         filled: true,
-        fillColor: Colors.grey[200],
-        contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+        fillColor: Colors.grey[100],
+        contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(
+            color: Theme.of(context).colorScheme.primary,
+            width: 2,
+          ),
+        ),
       ),
       obscureText: obscureText,
       keyboardType: keyboardType,
