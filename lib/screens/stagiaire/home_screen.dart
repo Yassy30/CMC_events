@@ -9,6 +9,8 @@ import 'package:cmc_ev/services/comment_service.dart';
 import 'package:cmc_ev/services/like_service.dart';
 import 'package:cmc_ev/services/auth_service.dart';
 import 'package:cmc_ev/screens/stagiaire/event_details_view.dart';
+import 'package:cmc_ev/screens/stagiaire/profil/profile_screen.dart'; // Import ProfileScreen
+
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -1415,10 +1417,20 @@ class _CommentsSectionState extends State<CommentsSection> {
   }
 }
 
+
 class CommentTile extends StatelessWidget {
   final model.Comment comment;
 
   const CommentTile({super.key, required this.comment});
+
+  void _navigateToUserProfile(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ProfileScreen(userId: comment.userId),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1426,7 +1438,7 @@ class CommentTile extends StatelessWidget {
     String formattedTime;
     final now = DateTime.now();
     final difference = now.difference(comment.createdAt);
-    
+
     if (difference.inSeconds < 60) {
       formattedTime = 'Just now';
     } else if (difference.inMinutes < 60) {
@@ -1438,19 +1450,22 @@ class CommentTile extends StatelessWidget {
     } else {
       formattedTime = DateFormat('MMM d, y').format(comment.createdAt);
     }
-    
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        CircleAvatar(
-          radius: 18,
-          backgroundImage: comment.userImageUrl != null
-              ? NetworkImage(comment.userImageUrl!)
-              : null,
-          backgroundColor: Colors.grey[200],
-          child: comment.userImageUrl == null
-              ? Icon(Icons.person, color: Colors.grey[600], size: 20)
-              : null,
+        GestureDetector(
+          onTap: () => _navigateToUserProfile(context),
+          child: CircleAvatar(
+            radius: 18,
+            backgroundImage: comment.userImageUrl != null
+                ? NetworkImage(comment.userImageUrl!)
+                : null,
+            backgroundColor: Colors.grey[200],
+            child: comment.userImageUrl == null
+                ? Icon(Icons.person, color: Colors.grey[600], size: 20)
+                : null,
+          ),
         ),
         SizedBox(width: 12),
         Expanded(
@@ -1502,7 +1517,7 @@ class CommentTile extends StatelessWidget {
       ],
     );
   }
-  
+
   Widget _buildCommentAction(String text) {
     return Text(
       text,
@@ -1514,5 +1529,3 @@ class CommentTile extends StatelessWidget {
     );
   }
 }
-
-

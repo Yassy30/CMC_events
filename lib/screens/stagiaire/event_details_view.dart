@@ -1154,12 +1154,23 @@ class _EventDetailsCommentsSectionState extends State<_EventDetailsCommentsSecti
   }
 }
 
+
+
 class _EventDetailsCommentTile extends StatelessWidget {
   final Comment comment;
 
   const _EventDetailsCommentTile({
     required this.comment,
   });
+
+  void _navigateToUserProfile(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ProfileScreen(userId: comment.userId),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1182,13 +1193,16 @@ class _EventDetailsCommentTile extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        CircleAvatar(
-          radius: 18,
-          backgroundImage: comment.userImageUrl != null ? NetworkImage(comment.userImageUrl!) : null,
-          backgroundColor: Colors.grey[200],
-          child: comment.userImageUrl == null
-              ? Icon(Icons.person, color: Colors.grey[600], size: 20)
-              : null,
+        GestureDetector(
+          onTap: () => _navigateToUserProfile(context),
+          child: CircleAvatar(
+            radius: 18,
+            backgroundImage: comment.userImageUrl != null ? NetworkImage(comment.userImageUrl!) : null,
+            backgroundColor: Colors.grey[200],
+            child: comment.userImageUrl == null
+                ? Icon(Icons.person, color: Colors.grey[600], size: 20)
+                : null,
+          ),
         ),
         const SizedBox(width: 12),
         Expanded(
@@ -1248,3 +1262,4 @@ class _EventDetailsCommentTile extends StatelessWidget {
     );
   }
 }
+

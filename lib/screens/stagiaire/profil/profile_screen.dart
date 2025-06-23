@@ -40,6 +40,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   bool _isLoading = false;
   late TabController _tabController;
   bool _isCurrentUser = false;
+  bool _isFollowing = false;
 
   @override
   void initState() {
@@ -70,6 +71,10 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     try {
       final profile = await _profileService.getUserProfile(targetUserId);
       final counts = await _profileService.getFollowCounts(targetUserId);
+      bool isFollowing = false;
+      if (!_isCurrentUser && currentUserId != null) {
+        isFollowing = await _profileService.isFollowing(currentUserId, targetUserId);
+      }
       
       if (profile != null && mounted) {
         setState(() {
@@ -77,6 +82,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
           _usernameController.text = profile.username;
           _bioController.text = profile.bio ?? '';
           followCounts = counts;
+          _isFollowing = isFollowing;
         });
       } else {
         if (mounted) {
@@ -191,6 +197,39 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
       }
     }
     return false;
+  }
+
+  Future<void> _toggleFollow() async {
+    if (!_authService.isLoggedIn) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Veuillez vous connecter pour suivre')),
+      );
+      return;
+    }
+
+    try {
+      final currentUserId = _authService.getCurrentUser()?.id;
+      if (currentUserId == null) return;
+
+      await _profileService.followUser(currentUserId, widget.userId!, !_isFollowing);
+      final counts = await _profileService.getFollowCounts(widget.userId!);
+
+      if (mounted) {
+        setState(() {
+          _isFollowing = !_isFollowing;
+          followCounts['followers'] = counts['followers']!;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(_isFollowing ? 'Vous suivez maintenant' : 'Vous ne suivez plus')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur : $e')),
+        );
+      }
+    }
   }
 
   void _navigateToEditProfile() {
@@ -489,6 +528,26 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                             user!.bio!,
                             style: Theme.of(context).textTheme.bodyLarge,
                             textAlign: TextAlign.center,
+                          ),
+                        ],
+                        if (!_isCurrentUser) ...[
+                          SizedBox(height: 16),
+                          OutlinedButton(
+                            onPressed: _toggleFollow,
+                            style: OutlinedButton.styleFrom(
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              side: BorderSide(color: Theme.of(context).colorScheme.primary),
+                              padding: EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                            ),
+                            child: Text(
+                              _isFollowing ? 'Unfollow' : 'Follow',
+                              style: TextStyle(
+                                color: Theme.of(context).colorScheme.primary,
+                                fontSize: 14,
+                              ),
+                            ),
                           ),
                         ],
                         SizedBox(height: 16),

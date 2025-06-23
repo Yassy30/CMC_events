@@ -117,6 +117,19 @@ Future<bool> updateProfile(
     }
   }
 
+   Future<void> unfollowUser(String followerId, String followedId) async {
+    try {
+      await _supabase
+          .from('followers')
+          .delete()
+          .eq('follower_id', followerId)
+          .eq('followed_id', followedId);
+    } catch (e) {
+      print('Error unfollowing user: $e');
+      throw Exception('Failed to unfollow user');
+    }
+  }
+
   Future<Map<String, int>> getFollowCounts(String userId) async {
     try {
       final followers = await _supabase
