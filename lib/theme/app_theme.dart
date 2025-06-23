@@ -14,4 +14,6 @@ class AppTheme {
       elevation: 0,
     ),
   );
+
+  static var primaryColor = const Color(0xFF37A2BC);
 }

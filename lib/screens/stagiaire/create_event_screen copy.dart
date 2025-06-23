@@ -34,15 +34,18 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   String? _selectedCategory;
   final _eventService = EventService();
 
-  final List<String> _categories = [
-    'All Events',
-    'Art & Design',
-    'Sports',
-    'Gaming',
-    'Music',
-    'Tech',
-   
-  ];
+final Map<String, String> _categories = {
+  'culture': 'Art & Design',
+  'sport': 'Sports',
+  'competition': 'Gaming',
+  'music': 'Music',
+  'tech': 'Tech',
+  'other': 'Other',
+};
+
+String _formatCategoryDisplay(String category) {
+  return _categories[category] ?? (category[0].toUpperCase() + category.substring(1));
+}
 
   @override
   void initState() {
@@ -175,10 +178,12 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     // Map from display categories to database categories
     final Map<String, String> categoryMap = {
       'All Events': 'other',
-      'Art & Design': 'art_design',
+      'Art & Design': 'culture',
       'Sports': 'sport',
-      'Competition': 'competition',
-      'Culture': 'culture',
+      'Gaming': 'competition',
+      'Music': 'music',
+      'Tech': 'tech',
+      'Other': 'other',
     };
     
     return categoryMap[displayCategory] ?? 'other';
@@ -232,7 +237,15 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
       }
 
       print('Creating event with creatorId: $creatorId, paymentType: $paymentType, ticketPrice: $ticketPrice');
-
+  // await _eventService.createEvent(
+  //   title: 'My Event',
+  //   description: 'Event Description',
+  //   startDate: DateTime.now().add(Duration(days: 1)),
+  //   location: 'Event Location',
+  //   category: 'culture',
+  //   paymentType: 'Free',
+  //   imageUrl: 'https://example.com/image.jpg',
+  // );
   await _eventService.createEvent(
         title: _titleController.text,
         description: _descriptionController.text,
@@ -269,7 +282,6 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Créer un événement'),
-        automaticallyImplyLeading: false,
       ),
       floatingActionButton: Column(
         mainAxisAlignment: MainAxisAlignment.end,
@@ -333,18 +345,12 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                 labelText: 'Catégorie',
                 border: OutlineInputBorder(),
               ),
-items: _categories.map((category) {
+items: _categories.entries.map((entry) {
   return DropdownMenuItem<String>(
-    value: category,
-    child: Text(category),
+    value: entry.key, // Raw enum value (e.g., 'sport')
+    child: Text(entry.value), // Display name (e.g., 'Sports')
   );
 }).toList(),
-            // items: _categories.entries.map((entry) {
-            //   return DropdownMenuItem<String>(
-            //     value: entry.key, // Raw enum value (e.g., 'sport')
-            //     child: Text(entry.value), // Display name (e.g., 'Sports')
-            //   );
-            // }).toList(),
               onChanged: (String? newValue) {
                 setState(() {
                   _selectedCategory = newValue;
