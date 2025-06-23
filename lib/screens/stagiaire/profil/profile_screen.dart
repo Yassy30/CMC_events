@@ -470,8 +470,11 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(_isCurrentUser ? 'Profil' : user?.username ?? 'Profil', style: Theme.of(context).textTheme.titleLarge),
-        automaticallyImplyLeading: true, // Allow back button for non-current user
+        title: Text(
+          _isCurrentUser ? 'Profil' : user?.username ?? 'Profil',
+          style: Theme.of(context).textTheme.titleLarge,
+        ),
+        automaticallyImplyLeading: !_isCurrentUser, // false for current user, true for other users
         actions: _isCurrentUser
             ? [
                 IconButton(
