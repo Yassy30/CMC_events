@@ -38,8 +38,8 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     'All Events',
     'Art & Design',
     'Sports',
-    'Gaming',
-    'Music',
+    'Comptetion',
+    'Culture',
     'Tech',
    
   ];
@@ -233,12 +233,23 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
 
       print('Creating event with creatorId: $creatorId, paymentType: $paymentType, ticketPrice: $ticketPrice');
 
-  await _eventService.createEvent(
+      // Transformez "All Events" en catégorie valide
+      String dbCategory;
+      if (_selectedCategory == 'All Events') {
+        // Utilisez une catégorie par défaut
+        dbCategory = 'other';
+      } else {
+        // Utilisez la fonction de mappage existante
+        dbCategory = _mapDisplayCategoryToDatabase(_selectedCategory!);
+      }
+  
+      // Utilisez dbCategory au lieu de _selectedCategory! lors de la création
+      await _eventService.createEvent(
         title: _titleController.text,
         description: _descriptionController.text,
         startDate: startDate,
         location: _locationController.text,
-        category: _selectedCategory!,
+        category: dbCategory,
         paymentType: paymentType,
         ticketPrice: ticketPrice,
         maxAttendees: int.tryParse(_maxAttendeesController.text),
