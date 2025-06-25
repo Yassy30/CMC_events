@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:cmc_ev/navigation/bottom_navigation.dart';
 import 'package:cmc_ev/screens/stagiaire/create_event_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -662,21 +663,22 @@ class _StatItem extends StatelessWidget {
   }
 }
 
+
 class ProfileEventCard extends StatefulWidget {
   final Event event;
 
   const ProfileEventCard({super.key, required this.event});
 
-  @override 
+  @override
   State<ProfileEventCard> createState() => _ProfileEventCardState();
-} 
+}
 
 class _ProfileEventCardState extends State<ProfileEventCard> {
   final _eventService = EventService();
   final _likeService = LikeService();
   final _commentService = CommentService();
   final _authService = AuthService();
-  
+
   int _likesCount = 0;
   int _commentsCount = 0;
   bool _isLiked = false;
@@ -692,13 +694,13 @@ class _ProfileEventCardState extends State<ProfileEventCard> {
     try {
       final likesCountFuture = _likeService.getLikesCount(widget.event.id);
       final commentsCountFuture = _eventService.getCommentsCount(widget.event.id);
-      
+
       List<dynamic> results = [0, 0, false];
-      
+
       if (_authService.isLoggedIn) {
         final userId = _authService.currentUserId;
         final isLikedFuture = _likeService.isEventLikedByUser(widget.event.id, userId);
-        
+
         results = await Future.wait([
           likesCountFuture,
           commentsCountFuture,
@@ -709,11 +711,11 @@ class _ProfileEventCardState extends State<ProfileEventCard> {
           likesCountFuture,
           commentsCountFuture,
         ]);
-        
+
         results[0] = partialResults[0];
         results[1] = partialResults[1];
       }
-      
+
       if (mounted) {
         setState(() {
           _likesCount = results[0] as int;
@@ -735,7 +737,7 @@ class _ProfileEventCardState extends State<ProfileEventCard> {
   Future<void> _toggleLike() async {
     if (!_authService.isLoggedIn) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please log in to like events'))
+        const SnackBar(content: Text('Please log in to like events')),
       );
       return;
     }
@@ -743,9 +745,9 @@ class _ProfileEventCardState extends State<ProfileEventCard> {
     try {
       final userId = _authService.currentUserId;
       final wasLiked = _isLiked;
-      
+
       final isLiked = await _likeService.toggleLike(widget.event.id, userId);
-      
+
       if (mounted) {
         setState(() {
           if (wasLiked != isLiked) {
@@ -756,7 +758,7 @@ class _ProfileEventCardState extends State<ProfileEventCard> {
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: ${e.toString()}'))
+        SnackBar(content: Text('Error: ${e.toString()}')),
       );
     }
   }
@@ -766,9 +768,9 @@ class _ProfileEventCardState extends State<ProfileEventCard> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => event_details_full_page.EventDetailsFullPage(
+        builder: (context) => EventDetailsFullPage(
           event: widget.event,
-          controller: scrollController,
+          // controller: scrollController,
         ),
       ),
     );
@@ -781,7 +783,7 @@ class _ProfileEventCardState extends State<ProfileEventCard> {
       backgroundColor: Colors.transparent,
       builder: (context) {
         final scrollController = ScrollController();
-        
+
         return Container(
           height: MediaQuery.of(context).size.height * 0.75,
           decoration: const BoxDecoration(
@@ -846,195 +848,243 @@ class _ProfileEventCardState extends State<ProfileEventCard> {
     );
   }
 
+  Future<void> _deleteEvent() async {
+    if (widget.event.id == null || widget.event.id!.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Erreur : ID de l\'événement manquant')),
+      );
+      return;
+    }
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Confirmer la suppression'),
+        content: const Text('Voulez-vous vraiment supprimer cet événement ? Cette action est irréversible.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Annuler'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Supprimer', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    try {
+      await _eventService.deleteEvent(widget.event.id!);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Événement supprimé avec succès !')),
+        );
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const MainNavigation()),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Échec de la suppression : $e')),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    
-  return Card(
-    margin: EdgeInsets.zero,
-    clipBehavior: Clip.antiAlias,
-    elevation: 0,
-    shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(10),
-      side: BorderSide(color: Colors.grey.shade200),
-    ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        GestureDetector(
-          onTap: () => _showEventDetails(context),
-          child: Stack(
-            children: [
-              AspectRatio(
-                aspectRatio: 16 / 8,
-                child: Image.network(
-                  widget.event.imageUrl,
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) {
-                    return Container(
-                      color: Colors.grey[300],
-                      child: const Icon(Icons.error),
-                    );
-                  },
-                ),
-              ),
-              Positioned(
-                top: 8,
-                right: 8,
-                child: Container(
-                  padding: EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.6),
-                    borderRadius: BorderRadius.circular(12),
+
+    return Card(
+      margin: EdgeInsets.zero,
+      clipBehavior: Clip.antiAlias,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10),
+        side: BorderSide(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          GestureDetector(
+            onTap: () => _showEventDetails(context),
+            child: Stack(
+              children: [
+                AspectRatio(
+                  aspectRatio: 16 / 8,
+                  child: Image.network(
+                    widget.event.imageUrl,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) {
+                      return Container(
+                        color: Colors.grey[300],
+                        child: const Icon(Icons.error),
+                      );
+                    },
                   ),
-                  child: Text(
-                    widget.event.paymentType == 'paid' ? 'Paid' : 'Free',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w500,
+                ),
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.6),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      widget.event.paymentType == 'paid' ? 'Paid' : 'Free',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-        Padding(
-          padding: const EdgeInsets.all(10.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                widget.event.title,
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-              SizedBox(height: 6),
-              Row(
-                children: [
-                  Icon(
-                    Icons.location_on_outlined,
-                    size: 12,
-                    color: Colors.grey[600],
+          Padding(
+            padding: const EdgeInsets.all(10.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  widget.event.title,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
                   ),
-                  SizedBox(width: 4),
-                  Expanded(
-                    child: Text(
-                      widget.event.location ?? 'No location specified',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.location_on_outlined,
+                      size: 12,
+                      color: Colors.grey[600],
+                    ),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        widget.event.location ?? 'No location specified',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Colors.grey[600],
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.calendar_today_outlined,
+                      size: 12,
+                      color: Colors.grey[600],
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      DateFormat('E, MMM d • h:mm a').format(widget.event.startDate),
                       style: TextStyle(
                         fontSize: 11,
                         color: Colors.grey[600],
                       ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
                     ),
-                  ),
-                ],
-              ),
-              SizedBox(height: 2),
-              Row(
-                children: [
-                  Icon(
-                    Icons.calendar_today_outlined,
-                    size: 12,
-                    color: Colors.grey[600],
-                  ),
-                  SizedBox(width: 4),
-                  Text(
-                    DateFormat('E, MMM d • h:mm a').format(widget.event.startDate),
-                    style: TextStyle(
-                      fontSize: 11,
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    _buildSocialAction(
+                      icon: _isLiked ? Icons.favorite : Icons.favorite_border,
+                      text: '$_likesCount',
+                      onTap: _toggleLike,
+                      isActive: _isLiked,
+                      color: _isLiked ? Colors.red : Colors.grey[600],
+                    ),
+                    const SizedBox(width: 12),
+                    _buildSocialAction(
+                      icon: Icons.chat_bubble_outline,
+                      text: '$_commentsCount',
+                      onTap: () => _showComments(context),
                       color: Colors.grey[600],
                     ),
-                  ),
-                ],
-              ),
-              SizedBox(height: 8),
-              Row(
-                children: [
-                  _buildSocialAction(
-                    icon: _isLiked ? Icons.favorite : Icons.favorite_border,
-                    text: '$_likesCount',
-                    onTap: _toggleLike,
-                    isActive: _isLiked,
-                    color: _isLiked ? Colors.red : Colors.grey[600],
-                  ),
-                  SizedBox(width: 12),
-                  _buildSocialAction(
-                    icon: Icons.chat_bubble_outline,
-                    text: '$_commentsCount',
-                    onTap: () => _showComments(context),
-                    color: Colors.grey[600],
-                  ),
-                  SizedBox(width: 12),
-                  _buildSocialAction(
-                    icon: Icons.share_outlined,
-                    text: 'Share',
-                    onTap: () => _shareEvent(context),
-                    color: Colors.grey[600],
-                  ),
-                  Spacer(),
-                  OutlinedButton(
-                    onPressed: () => _showEventDetails(context),
-                    style: OutlinedButton.styleFrom(
-                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 0),
-                      minimumSize: Size(0, 24),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      side: BorderSide(color: theme.colorScheme.primary, width: 1),
+                    const SizedBox(width: 12),
+                    _buildSocialAction(
+                      icon: Icons.share_outlined,
+                      text: 'Share',
+                      onTap: () => _shareEvent(context),
+                      color: Colors.grey[600],
                     ),
-                    child: Text(
-                      'Details',
-                      style: TextStyle(
-                        fontSize: 10,
-                        color: theme.colorScheme.primary,
-                      ),
-                    ),
-                  ),
-                  SizedBox(width: 8), // Add spacing between buttons
-                  OutlinedButton(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => CreateEventScreen(
-                            // event: widget.event, // Pass the event for editing
-                          ),
-                        
+                    const Spacer(),
+                    OutlinedButton(
+                      onPressed: _deleteEvent,
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+                        minimumSize: const Size(0, 24),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
                         ),
-                      );
-                    },
-                    style: OutlinedButton.styleFrom(
-                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 0),
-                      minimumSize: Size(0, 24),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                        side: const BorderSide(color: Colors.redAccent, width: 1),
                       ),
-                      side: BorderSide(color: theme.colorScheme.primary, width: 1),
-                    ),
-                    child: Text(
-                      'Modifier',
-                      style: TextStyle(
-                        fontSize: 10,
-                        color: theme.colorScheme.primary,
+                      child: const Text(
+                        'Supprimer',
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: Colors.redAccent,
+                        ),
                       ),
                     ),
-                  ),
-                ],
-              ),
-            ],
+                    const SizedBox(width: 8),
+                    OutlinedButton(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => CreateEventScreen(
+                              event: widget.event,
+                            ),
+                          ),
+                        );
+                      },
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+                        minimumSize: const Size(0, 24),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        side: BorderSide(color: theme.colorScheme.primary, width: 1),
+                      ),
+                      child: Text(
+                        'Modifier',
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: theme.colorScheme.primary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
-        ),
-      ],
-    ),
-  );
-}
+        ],
+      ),
+    );
+  }
+
   Widget _buildSocialAction({
     required IconData icon,
     required String text,
@@ -1054,7 +1104,7 @@ class _ProfileEventCardState extends State<ProfileEventCard> {
               size: 14,
               color: color,
             ),
-            SizedBox(width: 4),
+            const SizedBox(width: 4),
             Text(
               text,
               style: TextStyle(

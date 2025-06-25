@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:cmc_ev/models/event.dart';
 import 'package:cmc_ev/services/auth_service.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -18,7 +19,9 @@ import 'package:flutter/services.dart';
 import 'package:cmc_ev/screens/stagiaire/_image_picker.dart';
 
 class CreateEventScreen extends StatefulWidget {
-  const CreateEventScreen({super.key});
+  final Event? event;
+
+  const CreateEventScreen({super.key, this.event});
 
   @override
   State<CreateEventScreen> createState() => _CreateEventScreenState();
@@ -27,6 +30,7 @@ class CreateEventScreen extends StatefulWidget {
 class _CreateEventScreenState extends State<CreateEventScreen> {
   final _formKey = GlobalKey<FormState>();
   bool _isFree = true;
+  bool _isCancelled = false; // New state for cancellation
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
   final _promptController = TextEditingController();
@@ -39,23 +43,37 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   String? _selectedCategory;
   final _eventService = EventService();
 
-final Map<String, String> _categories = {
-  'culture': 'Art & Design',
-  'sport': 'Sports',
-  'competition': 'Gaming',
-  'music': 'Music',
-  'tech': 'Tech',
-  'other': 'Other',
-};
+  final Map<String, String> _categories = {
+    'culture': 'Art & Design',
+    'sport': 'Sports',
+    'competition': 'Gaming',
+    'music': 'Music',
+    'tech': 'Tech',
+    'other': 'Other',
+  };
 
-String _formatCategoryDisplay(String category) {
-  return _categories[category] ?? (category[0].toUpperCase() + category.substring(1));
-}
+  String _formatCategoryDisplay(String category) {
+    return _categories[category] ?? (category[0].toUpperCase() + category.substring(1));
+  }
 
   @override
   void initState() {
     super.initState();
-    _selectedCategory = _categories[0];
+    if (widget.event != null) {
+      _titleController.text = widget.event!.title;
+      _descriptionController.text = widget.event!.description ?? '';
+      _locationController.text = widget.event!.location ?? '';
+      _selectedCategory = widget.event!.category;
+      _selectedDate = widget.event!.startDate;
+      _selectedTime = TimeOfDay.fromDateTime(widget.event!.startDate);
+      _maxAttendeesController.text = widget.event!.maxAttendees?.toString() ?? '';
+      _isFree = widget.event!.paymentType == 'free';
+      _priceController.text = widget.event!.ticketPrice?.toString() ?? '';
+      _imageUrl = widget.event!.imageUrl;
+      _isCancelled = widget.event!.isCompleted ?? false; // Initialize cancellation status
+    } else {
+      _selectedCategory = _categories.keys.first;
+    }
   }
 
   @override
@@ -79,7 +97,10 @@ String _formatCategoryDisplay(String category) {
       if (title.isEmpty) {
         title = '${adjectives[random.nextInt(adjectives.length)]} ${eventTypes[random.nextInt(eventTypes.length)]}';
       } else {
-        title = title.split(' ').map((word) => word.isNotEmpty ? '${word[0].toUpperCase()}${word.substring(1).toLowerCase()}' : '').join(' ');
+        title = title
+            .split(' ')
+            .map((word) => word.isNotEmpty ? '${word[0].toUpperCase()}${word.substring(1).toLowerCase()}' : '')
+            .join(' ');
         title = '${adjectives[random.nextInt(adjectives.length)]} $title ${eventTypes[random.nextInt(eventTypes.length)]}';
       }
 
@@ -87,7 +108,8 @@ String _formatCategoryDisplay(String category) {
       if (prompt.isNotEmpty) {
         description += 'This event focuses on $prompt, offering a ${adjectives[random.nextInt(adjectives.length)].toLowerCase()} time for all. ';
       }
-      description += 'Expect ${['live music', 'fun activities', 'great food', 'exciting games', 'special performances'][random.nextInt(5)]} ';
+      description +=
+          'Expect ${['live music', 'fun activities', 'great food', 'exciting games', 'special performances'][random.nextInt(5)]} ';
       description += 'on ${DateTime.now().toString().split(' ')[0]} at a location near you. Don’t miss out!';
 
       return {'title': title, 'description': description};
@@ -101,7 +123,7 @@ String _formatCategoryDisplay(String category) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Générateur IA (100% Free)'),
+        title: const Text('Générateur IA de titre et description'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -160,27 +182,7 @@ String _formatCategoryDisplay(String category) {
     );
   }
 
-  // Future<String?> _fetchFirstUserId() async {
-  //   try {
-  //     final response = await SupabaseConfig.client
-  //         .from('users')
-  //         .select('id')
-  //         .limit(1)
-  //         .maybeSingle();
-
-  //     if (response != null && response['id'] != null) {
-  //       print("the user id : ${response['id'] as String}");
-  //       return response['id'] as String;
-  //     }
-  //     print('No users found in the database.');
-  //   } catch (e) {
-  //     print('Error fetching first user: $e');
-  //   }
-  //   return null;
-  // }
-
   String _mapDisplayCategoryToDatabase(String displayCategory) {
-    // Map from display categories to database categories
     final Map<String, String> categoryMap = {
       'All Events': 'other',
       'Art & Design': 'culture',
@@ -190,11 +192,10 @@ String _formatCategoryDisplay(String category) {
       'Tech': 'tech',
       'Other': 'other',
     };
-    
     return categoryMap[displayCategory] ?? 'other';
   }
 
-  Future<void> _createEvent() async {
+  Future<void> _saveEvent() async {
     if (!_formKey.currentState!.validate()) return;
     if (_selectedDate == null || _selectedTime == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -210,13 +211,13 @@ String _formatCategoryDisplay(String category) {
     }
 
     final authService = AuthService();
-final creatorId = authService.currentUserId;
-if (creatorId.isEmpty) {
-  ScaffoldMessenger.of(context).showSnackBar(
-    const SnackBar(content: Text('User must be logged in to create an event.')),
-  );
-  return;
-}
+    final creatorId = authService.currentUserId;
+    if (creatorId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('User must be logged in to save an event.')),
+      );
+      return;
+    }
 
     try {
       final startDate = DateTime(
@@ -230,7 +231,6 @@ if (creatorId.isEmpty) {
       double? ticketPrice;
       String paymentType = 'free';
       if (!_isFree) {
-        print('Price text before parsing: "${_priceController.text}"');
         final priceText = _priceController.text.trim();
         ticketPrice = double.tryParse(priceText);
         if (ticketPrice == null || ticketPrice <= 0) {
@@ -242,24 +242,49 @@ if (creatorId.isEmpty) {
         paymentType = 'paid';
       }
 
-      print('Creating event with creatorId: $creatorId, paymentType: $paymentType, ticketPrice: $ticketPrice');
+      if (widget.event == null) {
+        // Create new event
+        await _eventService.createEvent(
+          title: _titleController.text,
+          description: _descriptionController.text,
+          startDate: startDate,
+          location: _locationController.text,
+          category: _selectedCategory!,
+          paymentType: paymentType,
+          ticketPrice: ticketPrice,
+          maxAttendees: int.tryParse(_maxAttendeesController.text),
+          imageUrl: _imageUrl ?? 'https://via.placeholder.com/150',
+        );
 
-  await _eventService.createEvent(
-        title: _titleController.text,
-        description: _descriptionController.text,
-        startDate: startDate,
-        location: _locationController.text,
-        category: _selectedCategory!,
-        paymentType: paymentType,
-        ticketPrice: ticketPrice,
-        maxAttendees: int.tryParse(_maxAttendeesController.text),
-        imageUrl: _imageUrl ?? 'https://via.placeholder.com/150',
-      );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Event created successfully!')),
+          );
+        }
+      } else {
+        // Update existing event
+        await _eventService.updateEvent(
+          id: widget.event!.id!,
+          title: _titleController.text,
+          description: _descriptionController.text,
+          startDate: startDate,
+          location: _locationController.text,
+          category: _selectedCategory!,
+          paymentType: paymentType,
+          ticketPrice: ticketPrice,
+          maxAttendees: int.tryParse(_maxAttendeesController.text),
+          imageUrl: _imageUrl ?? 'https://via.placeholder.com/150',
+          isCompleted: _isCancelled, // Pass cancellation status
+        );
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Event updated successfully!')),
+          );
+        }
+      }
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Event created successfully!')),
-        );
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => const MainNavigation()),
@@ -267,9 +292,9 @@ if (creatorId.isEmpty) {
       }
     } catch (e) {
       if (mounted) {
-        print('Failed to create event: $e');
+        print('Failed to save event: $e');
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to create event: $e')),
+          SnackBar(content: Text('Failed to save event: $e')),
         );
       }
     }
@@ -279,7 +304,8 @@ if (creatorId.isEmpty) {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Créer un événement'),
+        title: Text(widget.event == null ? 'Créer un événement' : 'Modifier l\'événement'),
+        automaticallyImplyLeading: true,
       ),
       floatingActionButton: Column(
         mainAxisAlignment: MainAxisAlignment.end,
@@ -343,12 +369,12 @@ if (creatorId.isEmpty) {
                 labelText: 'Catégorie',
                 border: OutlineInputBorder(),
               ),
-items: _categories.entries.map((entry) {
-  return DropdownMenuItem<String>(
-    value: entry.key, // Raw enum value (e.g., 'sport')
-    child: Text(entry.value), // Display name (e.g., 'Sports')
-  );
-}).toList(),
+              items: _categories.entries.map((entry) {
+                return DropdownMenuItem<String>(
+                  value: entry.key,
+                  child: Text(entry.value),
+                );
+              }).toList(),
               onChanged: (String? newValue) {
                 setState(() {
                   _selectedCategory = newValue;
@@ -380,7 +406,7 @@ items: _categories.entries.map((entry) {
                     onTap: () async {
                       final date = await showDatePicker(
                         context: context,
-                        initialDate: DateTime.now(),
+                        initialDate: _selectedDate ?? DateTime.now(),
                         firstDate: DateTime.now(),
                         lastDate: DateTime.now().add(const Duration(days: 365)),
                       );
@@ -400,14 +426,12 @@ items: _categories.entries.map((entry) {
                     ),
                     readOnly: true,
                     controller: TextEditingController(
-                      text: _selectedTime != null
-                          ? _selectedTime!.format(context)
-                          : '',
+                      text: _selectedTime != null ? _selectedTime!.format(context) : '',
                     ),
                     onTap: () async {
                       final time = await showTimePicker(
                         context: context,
-                        initialTime: TimeOfDay.now(),
+                        initialTime: _selectedTime ?? TimeOfDay.now(),
                       );
                       if (time != null) {
                         setState(() => _selectedTime = time);
@@ -442,7 +466,7 @@ items: _categories.entries.map((entry) {
               ),
               keyboardType: TextInputType.number,
               validator: (value) {
-                if (value != null && value.isEmpty) {
+                if (value != null && value.isNotEmpty) {
                   final number = int.tryParse(value);
                   if (number == null || number <= 0) {
                     return 'Veuillez entrer un nombre valide';
@@ -484,10 +508,24 @@ items: _categories.entries.map((entry) {
                 },
               ),
             ],
+            if (widget.event != null) ...[
+              const SizedBox(height: 16),
+              SwitchListTile(
+                title: const Text('Annuler l\'événement'),
+                value: _isCancelled,
+                activeColor: Colors.red,
+                activeTrackColor: Colors.red.withOpacity(0.5),
+                onChanged: (value) {
+                  setState(() {
+                    _isCancelled = value;
+                  });
+                },
+              ),
+            ],
             const SizedBox(height: 24),
             FilledButton(
-              onPressed: _createEvent,
-              child: const Text('Créer l\'événement'),
+              onPressed: _saveEvent,
+              child: Text(widget.event == null ? 'Créer l\'événement' : 'Mettre à jour l\'événement'),
             ),
           ],
         ),
@@ -516,7 +554,6 @@ items: _categories.entries.map((entry) {
               title: const Text('Generate Image'),
               onTap: () {
                 Navigator.pop(context);
-                // Handled in _ImagePickerState
               },
             ),
           ],
@@ -576,6 +613,8 @@ items: _categories.entries.map((entry) {
     );
   }
 }
+
+
 
 class _ImagePicker extends StatefulWidget {
   final Function(String)? onImageSelected;
@@ -637,6 +676,8 @@ class _ImagePickerState extends State<_ImagePicker> {
     final img = await picture.toImage(size.width.toInt(), size.height.toInt());
     return img;
   }
+
+  
 
   Future<void> _generateAndUploadImage() async {
     final description = widget.descriptionController.text.isNotEmpty
