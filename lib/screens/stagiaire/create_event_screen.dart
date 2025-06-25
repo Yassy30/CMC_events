@@ -42,6 +42,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   String? _imageUrl;
   String? _selectedCategory;
   final _eventService = EventService();
+  bool _isLoading = false;
 
   final Map<String, String> _categories = {
     'culture': 'Art & Design',
@@ -300,6 +301,190 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     }
   }
 
+  Future<Uint8List> _generateImage(String description) async {
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder);
+    const size = Size(400, 300);
+
+    // Background with gradient
+    final gradient = ui.Gradient.linear(
+      const Offset(0, 0),
+      const Offset(400, 300),
+      [Colors.lightBlue, Colors.white],
+    );
+    canvas.drawRect(
+      Rect.fromLTWH(0, 0, size.width, size.height),
+      Paint()..shader = gradient,
+    );
+
+    // Draw a cat if "cat" is in the description
+    if (description.toLowerCase().contains('cat')) {
+      final paint = Paint()
+        ..style = PaintingStyle.fill
+        ..color = description.toLowerCase().contains('white') ? Colors.white : Colors.orange;
+
+      // Head with gradient
+      final headGradient = ui.Gradient.radial(
+        const Offset(200, 150),
+        60,
+        [paint.color.withOpacity(1), paint.color.withOpacity(0.5)],
+      );
+      canvas.drawCircle(const Offset(200, 150), 60, Paint()..shader = headGradient);
+
+      // Ears
+      final earPaint = Paint()..color = paint.color;
+      final leftEar = Path()
+        ..moveTo(150, 100)
+        ..lineTo(180, 130)
+        ..lineTo(200, 100)
+        ..close();
+      final rightEar = Path()
+        ..moveTo(250, 100)
+        ..lineTo(220, 130)
+        ..lineTo(200, 100)
+        ..close();
+      canvas.drawPath(leftEar, earPaint);
+      canvas.drawPath(rightEar, earPaint);
+
+      // Eyes
+      canvas.drawCircle(const Offset(180, 140), 10, Paint()..color = Colors.black);
+      canvas.drawCircle(const Offset(220, 140), 10, Paint()..color = Colors.black);
+
+      // Body
+      final bodyGradient = ui.Gradient.linear(
+        const Offset(180, 250),
+        const Offset(220, 250),
+        [paint.color, paint.color.withOpacity(0.7)],
+      );
+      canvas.drawOval(const Rect.fromLTWH(170, 200, 60, 80), Paint()..shader = bodyGradient);
+    }
+
+    final picture = recorder.endRecording();
+    final image = await picture.toImage(size.width.toInt(), size.height.toInt());
+    final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+    if (byteData == null) throw Exception('Failed to convert image to bytes');
+    final imageBytes = byteData.buffer.asUint8List();
+
+    // Clean up
+    image.dispose();
+
+    return imageBytes;
+  }
+
+  Future<void> _generateAndUploadImage(String description) async {
+    setState(() => _isLoading = true);
+
+    try {
+      // Generate the image
+      final imageBytes = await _generateImage(description);
+
+      // Upload to Supabase
+      final fileName = 'generated_event_${DateTime.now().millisecondsSinceEpoch}.png';
+      final path = 'public/$fileName';
+      await SupabaseConfig.client.storage.from('eventimages').uploadBinary(path, imageBytes);
+
+      // Get the public URL
+      final imageUrl = SupabaseConfig.client.storage.from('eventimages').getPublicUrl(path);
+
+      setState(() {
+        _imageUrl = imageUrl;
+        _isLoading = false;
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Image générée et téléchargée avec succès')),
+        );
+      }
+    } catch (e) {
+      setState(() => _isLoading = false);
+      print('Erreur lors de la génération/téléchargement de l\'image : $e');
+      if (mounted) {
+        String errorMessage = 'Échec de la génération ou du téléchargement de l\'image';
+        if (e.toString().contains('bucket')) {
+          errorMessage = 'Problème avec le stockage des images. Veuillez contacter l\'administrateur.';
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: Theme.of(context).colorScheme.error,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            margin: const EdgeInsets.all(16),
+          ),
+        );
+      }
+    }
+  }
+
+  void _showImageGeneratorDialog() {
+    final TextEditingController imagePromptController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Générateur IA d\'image'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: imagePromptController,
+              decoration: const InputDecoration(
+                labelText: 'Entrez une description pour générer l\'image',
+                hintText: 'e.g., A white cat',
+              ),
+              maxLines: 3,
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: () async {
+                  if (imagePromptController.text.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Veuillez entrer une description')),
+                    );
+                    return;
+                  }
+
+                  showDialog(
+                    context: context,
+                    barrierDismissible: false,
+                    builder: (context) => const Center(child: CircularProgressIndicator()),
+                  );
+
+                  try {
+                    await _generateAndUploadImage(imagePromptController.text);
+                    Navigator.pop(context); // Close loading dialog
+                    Navigator.pop(context); // Close generator dialog
+
+                    if (_imageUrl != null) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Image générée avec succès !')),
+                      );
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Erreur lors de la génération de l\'image')),
+                      );
+                    }
+                  } catch (e) {
+                    Navigator.pop(context); // Close loading dialog
+                    Navigator.pop(context); // Close generator dialog
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Erreur : $e')),
+                    );
+                  } finally {
+                    imagePromptController.dispose();
+                  }
+                },
+                child: const Text('Générer l\'image'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -537,13 +722,13 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Choose Image Option'),
+        title: const Text('Choisir une option d\'image'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
               leading: const Icon(Icons.image),
-              title: const Text('Upload Image'),
+              title: const Text('Télécharger une image'),
               onTap: () {
                 Navigator.pop(context);
                 _showImageSourceActionSheet();
@@ -551,9 +736,10 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
             ),
             ListTile(
               leading: const Icon(Icons.auto_awesome),
-              title: const Text('Generate Image'),
+              title: const Text('Générer une image'),
               onTap: () {
                 Navigator.pop(context);
+                _showImageGeneratorDialog();
               },
             ),
           ],
@@ -613,8 +799,6 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     );
   }
 }
-
-
 
 class _ImagePicker extends StatefulWidget {
   final Function(String)? onImageSelected;
@@ -677,20 +861,20 @@ class _ImagePickerState extends State<_ImagePicker> {
     return img;
   }
 
-  
-
-  Future<void> _generateAndUploadImage() async {
-    final description = widget.descriptionController.text.isNotEmpty
-        ? widget.descriptionController.text
-        : widget.promptController.text.isNotEmpty
-            ? widget.promptController.text
-            : 'Event Image';
+  Future<void> _generateAndUploadImage(String description) async {
+    final descriptionText = description.isNotEmpty
+        ? description
+        : widget.descriptionController.text.isNotEmpty
+            ? widget.descriptionController.text
+            : widget.promptController.text.isNotEmpty
+                ? widget.promptController.text
+                : 'Event Image';
 
     setState(() => _isUploading = true);
 
     try {
       // Generate the placeholder image
-      final image = await _generatePlaceholderImage(description);
+      final image = await _generatePlaceholderImage(descriptionText);
 
       // Convert ui.Image to byte data
       final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
@@ -747,9 +931,10 @@ class _ImagePickerState extends State<_ImagePicker> {
       String path = 'public/$fileName';
 
       // Use file_picker for web and desktop platforms, image_picker for mobile
-      if (kIsWeb || defaultTargetPlatform == TargetPlatform.windows || defaultTargetPlatform
-
- == TargetPlatform.macOS || defaultTargetPlatform == TargetPlatform.linux) {
+      if (kIsWeb ||
+          defaultTargetPlatform == TargetPlatform.windows ||
+          defaultTargetPlatform == TargetPlatform.macOS ||
+          defaultTargetPlatform == TargetPlatform.linux) {
         // Use file_picker for desktop and web
         FilePickerResult? result = await FilePicker.platform.pickFiles(
           type: FileType.image,
@@ -871,7 +1056,7 @@ class _ImagePickerState extends State<_ImagePicker> {
               title: const Text('Générer une image'),
               onTap: () {
                 Navigator.pop(context);
-                _generateAndUploadImage();
+                _generateAndUploadImage('');
               },
             ),
           ],
@@ -882,7 +1067,10 @@ class _ImagePickerState extends State<_ImagePicker> {
 
   void _showImageSourceActionSheet(BuildContext context) {
     // Show different options based on platform
-    if (kIsWeb || defaultTargetPlatform == TargetPlatform.windows || defaultTargetPlatform == TargetPlatform.macOS || defaultTargetPlatform == TargetPlatform.linux) {
+    if (kIsWeb ||
+        defaultTargetPlatform == TargetPlatform.windows ||
+        defaultTargetPlatform == TargetPlatform.macOS ||
+        defaultTargetPlatform == TargetPlatform.linux) {
       // For desktop and web, directly trigger file picker
       _pickAndUploadImage(null); // ImageSource is not needed for file_picker
     } else {
