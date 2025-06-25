@@ -12,6 +12,10 @@ import 'dart:math';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:flutter/rendering.dart';
+import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform, TargetPlatform;
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter/services.dart';
+import 'package:cmc_ev/screens/stagiaire/_image_picker.dart';
 
 class CreateEventScreen extends StatefulWidget {
   const CreateEventScreen({super.key});
@@ -667,15 +671,113 @@ class _ImagePickerState extends State<_ImagePicker> {
 
       widget.onImageSelected?.call(imageUrl);
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Image generated and uploaded successfully')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Image générée et téléchargée avec succès')),
+        );
+      }
     } catch (e) {
       setState(() => _isUploading = false);
-      print('Error generating/uploading image: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to generate or upload image.')),
-      );
+      print('Erreur lors de la génération/téléchargement de l\'image : $e');
+      if (mounted) {
+        String errorMessage = 'Échec de la génération ou du téléchargement de l\'image';
+        if (e.toString().contains('bucket')) {
+          errorMessage = 'Problème avec le stockage des images. Veuillez contacter l\'administrateur.';
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: Theme.of(context).colorScheme.error,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            margin: const EdgeInsets.all(16),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _pickAndUploadImage(ImageSource? source) async {
+    setState(() => _isUploading = true);
+
+    try {
+      XFile? image;
+      String fileName = 'event_${DateTime.now().millisecondsSinceEpoch}.png';
+      String path = 'public/$fileName';
+
+      // Use file_picker for web and desktop platforms, image_picker for mobile
+      if (kIsWeb || defaultTargetPlatform == TargetPlatform.windows || defaultTargetPlatform
+
+ == TargetPlatform.macOS || defaultTargetPlatform == TargetPlatform.linux) {
+        // Use file_picker for desktop and web
+        FilePickerResult? result = await FilePicker.platform.pickFiles(
+          type: FileType.image,
+          allowMultiple: false,
+        );
+
+        if (result != null && result.files.single.bytes != null) {
+          // For web, use bytes directly
+          final bytes = result.files.single.bytes!;
+          await SupabaseConfig.client.storage.from('eventimages').uploadBinary(path, bytes);
+        } else if (result != null && result.files.single.path != null) {
+          // For desktop, use file path
+          image = XFile(result.files.single.path!);
+        } else {
+          setState(() => _isUploading = false);
+          return; // User canceled the picker
+        }
+      } else {
+        // Use image_picker for mobile
+        if (source == null) {
+          setState(() => _isUploading = false);
+          return;
+        }
+        image = await _picker.pickImage(source: source);
+        if (image == null) {
+          setState(() => _isUploading = false);
+          return;
+        }
+      }
+
+      // If image is available (desktop or mobile), upload it
+      if (image != null) {
+        final file = File(image.path);
+        await SupabaseConfig.client.storage.from('eventimages').upload(path, file);
+      }
+
+      // Get the public URL
+      final publicUrl = SupabaseConfig.client.storage.from('eventimages').getPublicUrl(path);
+
+      setState(() {
+        _uploadedImageUrl = publicUrl;
+        _isUploading = false;
+      });
+
+      widget.onImageSelected?.call(publicUrl);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Image téléchargée avec succès')),
+        );
+      }
+    } catch (e) {
+      setState(() => _isUploading = false);
+      print('Erreur lors de la sélection/téléchargement de l\'image : $e');
+      if (mounted) {
+        String errorMessage = 'Échec de la sélection ou du téléchargement de l\'image';
+        if (e.toString().contains('bucket')) {
+          errorMessage = 'Problème avec le stockage des images. Veuillez contacter l\'administrateur.';
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: Theme.of(context).colorScheme.error,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            margin: const EdgeInsets.all(16),
+          ),
+        );
+      }
     }
   }
 
@@ -711,13 +813,13 @@ class _ImagePickerState extends State<_ImagePicker> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Choose Image Option'),
+        title: const Text('Choisir une option d\'image'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
               leading: const Icon(Icons.image),
-              title: const Text('Upload Image'),
+              title: const Text('Télécharger une image'),
               onTap: () {
                 Navigator.pop(context);
                 _showImageSourceActionSheet(context);
@@ -725,7 +827,7 @@ class _ImagePickerState extends State<_ImagePicker> {
             ),
             ListTile(
               leading: const Icon(Icons.auto_awesome),
-              title: const Text('Generate Image'),
+              title: const Text('Générer une image'),
               onTap: () {
                 Navigator.pop(context);
                 _generateAndUploadImage();
@@ -738,65 +840,36 @@ class _ImagePickerState extends State<_ImagePicker> {
   }
 
   void _showImageSourceActionSheet(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      builder: (_) => SafeArea(
-        child: Wrap(
-          children: [
-            ListTile(
-              leading: const Icon(Icons.photo_library),
-              title: const Text('Gallery'),
-              onTap: () {
-                Navigator.of(context).pop();
-                _pickAndUploadImage(ImageSource.gallery);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.camera_alt),
-              title: const Text('Camera'),
-              onTap: () {
-                Navigator.of(context).pop();
-                _pickAndUploadImage(ImageSource.camera);
-              },
-            ),
-          ],
+    // Show different options based on platform
+    if (kIsWeb || defaultTargetPlatform == TargetPlatform.windows || defaultTargetPlatform == TargetPlatform.macOS || defaultTargetPlatform == TargetPlatform.linux) {
+      // For desktop and web, directly trigger file picker
+      _pickAndUploadImage(null); // ImageSource is not needed for file_picker
+    } else {
+      // For mobile, show gallery/camera options
+      showModalBottomSheet(
+        context: context,
+        builder: (_) => SafeArea(
+          child: Wrap(
+            children: [
+              ListTile(
+                leading: const Icon(Icons.photo_library),
+                title: const Text('Galerie'),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _pickAndUploadImage(ImageSource.gallery);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.camera_alt),
+                title: const Text('Caméra'),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _pickAndUploadImage(ImageSource.camera);
+                },
+              ),
+            ],
+          ),
         ),
-      ),
-    );
-  }
-
-  Future<void> _pickAndUploadImage(ImageSource source) async {
-    try {
-      final XFile? image = await _picker.pickImage(source: source);
-      if (image == null) return;
-
-      setState(() => _isUploading = true);
-
-      final File imageFile = File(image.path);
-      final String fileName = 'event_${DateTime.now().millisecondsSinceEpoch}.png';
-      final String path = 'public/$fileName';
-
-      await SupabaseConfig.client.storage.from('eventimages').upload(path, imageFile);
-
-      final String publicUrl = SupabaseConfig.client.storage
-          .from('eventimages')
-          .getPublicUrl(path);
-
-      setState(() {
-        _uploadedImageUrl = publicUrl;
-        _isUploading = false;
-      });
-
-      widget.onImageSelected?.call(publicUrl);
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Image uploaded successfully')),
-      );
-    } catch (e) {
-      setState(() => _isUploading = false);
-      print('Error picking/uploading image: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to pick or upload image.')),
       );
     }
   }

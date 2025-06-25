@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:cmc_ev/screens/stagiaire/create_event_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:cmc_ev/services/auth_service.dart';
@@ -849,163 +850,191 @@ class _ProfileEventCardState extends State<ProfileEventCard> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     
-    return Card(
-      margin: EdgeInsets.zero,
-      clipBehavior: Clip.antiAlias,
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(10),
-        side: BorderSide(color: Colors.grey.shade200),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          GestureDetector(
-            onTap: () => _showEventDetails(context),
-            child: Stack(
-              children: [
-                AspectRatio(
-                  aspectRatio: 16 / 8,
-                  child: Image.network(
-                    widget.event.imageUrl,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Container(
-                        color: Colors.grey[300],
-                        child: const Icon(Icons.error),
-                      );
-                    },
+  return Card(
+    margin: EdgeInsets.zero,
+    clipBehavior: Clip.antiAlias,
+    elevation: 0,
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(10),
+      side: BorderSide(color: Colors.grey.shade200),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        GestureDetector(
+          onTap: () => _showEventDetails(context),
+          child: Stack(
+            children: [
+              AspectRatio(
+                aspectRatio: 16 / 8,
+                child: Image.network(
+                  widget.event.imageUrl,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) {
+                    return Container(
+                      color: Colors.grey[300],
+                      child: const Icon(Icons.error),
+                    );
+                  },
+                ),
+              ),
+              Positioned(
+                top: 8,
+                right: 8,
+                child: Container(
+                  padding: EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.6),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    widget.event.paymentType == 'paid' ? 'Paid' : 'Free',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ),
-                Positioned(
-                  top: 8,
-                  right: 8,
-                  child: Container(
-                    padding: EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.6),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      widget.event.paymentType == 'paid' ? 'Paid' : 'Free',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
-          Padding(
-            padding: const EdgeInsets.all(10.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  widget.event.title,
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
+        ),
+        Padding(
+          padding: const EdgeInsets.all(10.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                widget.event.title,
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              SizedBox(height: 6),
+              Row(
+                children: [
+                  Icon(
+                    Icons.location_on_outlined,
+                    size: 12,
+                    color: Colors.grey[600],
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                SizedBox(height: 6),
-                Row(
-                  children: [
-                    Icon(
-                      Icons.location_on_outlined, 
-                      size: 12, 
-                      color: Colors.grey[600],
-                    ),
-                    SizedBox(width: 4),
-                    Expanded(
-                      child: Text(
-                        widget.event.location ?? 'No location specified',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: Colors.grey[600],
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-                SizedBox(height: 2),
-                Row(
-                  children: [
-                    Icon(
-                      Icons.calendar_today_outlined, 
-                      size: 12, 
-                      color: Colors.grey[600],
-                    ),
-                    SizedBox(width: 4),
-                    Text(
-                      DateFormat('E, MMM d • h:mm a').format(widget.event.startDate),
+                  SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      widget.event.location ?? 'No location specified',
                       style: TextStyle(
                         fontSize: 11,
                         color: Colors.grey[600],
                       ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                  ],
-                ),
-                SizedBox(height: 8),
-                Row(
-                  children: [
-                    _buildSocialAction(
-                      icon: _isLiked ? Icons.favorite : Icons.favorite_border,
-                      text: '$_likesCount',
-                      onTap: _toggleLike,
-                      isActive: _isLiked,
-                      color: _isLiked ? Colors.red : Colors.grey[600],
-                    ),
-                    SizedBox(width: 12),
-                    _buildSocialAction(
-                      icon: Icons.chat_bubble_outline,
-                      text: '$_commentsCount',
-                      onTap: () => _showComments(context),
+                  ),
+                ],
+              ),
+              SizedBox(height: 2),
+              Row(
+                children: [
+                  Icon(
+                    Icons.calendar_today_outlined,
+                    size: 12,
+                    color: Colors.grey[600],
+                  ),
+                  SizedBox(width: 4),
+                  Text(
+                    DateFormat('E, MMM d • h:mm a').format(widget.event.startDate),
+                    style: TextStyle(
+                      fontSize: 11,
                       color: Colors.grey[600],
                     ),
-                    SizedBox(width: 12),
-                    _buildSocialAction(
-                      icon: Icons.share_outlined,
-                      text: 'Share',
-                      onTap: () => _shareEvent(context),
-                      color: Colors.grey[600],
-                    ),
-                    Spacer(),
-                    OutlinedButton(
-                      onPressed: () => _showEventDetails(context),
-                      style: OutlinedButton.styleFrom(
-                        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 0),
-                        minimumSize: Size(0, 24),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        side: BorderSide(color: theme.colorScheme.primary, width: 1),
+                  ),
+                ],
+              ),
+              SizedBox(height: 8),
+              Row(
+                children: [
+                  _buildSocialAction(
+                    icon: _isLiked ? Icons.favorite : Icons.favorite_border,
+                    text: '$_likesCount',
+                    onTap: _toggleLike,
+                    isActive: _isLiked,
+                    color: _isLiked ? Colors.red : Colors.grey[600],
+                  ),
+                  SizedBox(width: 12),
+                  _buildSocialAction(
+                    icon: Icons.chat_bubble_outline,
+                    text: '$_commentsCount',
+                    onTap: () => _showComments(context),
+                    color: Colors.grey[600],
+                  ),
+                  SizedBox(width: 12),
+                  _buildSocialAction(
+                    icon: Icons.share_outlined,
+                    text: 'Share',
+                    onTap: () => _shareEvent(context),
+                    color: Colors.grey[600],
+                  ),
+                  Spacer(),
+                  OutlinedButton(
+                    onPressed: () => _showEventDetails(context),
+                    style: OutlinedButton.styleFrom(
+                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+                      minimumSize: Size(0, 24),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                      child: Text(
-                        'Details',
-                        style: TextStyle(
-                          fontSize: 10,
-                          color: theme.colorScheme.primary,
-                        ),
+                      side: BorderSide(color: theme.colorScheme.primary, width: 1),
+                    ),
+                    child: Text(
+                      'Details',
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: theme.colorScheme.primary,
                       ),
                     ),
-                  ],
-                ),
-              ],
-            ),
+                  ),
+                  SizedBox(width: 8), // Add spacing between buttons
+                  OutlinedButton(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => CreateEventScreen(
+                            // event: widget.event, // Pass the event for editing
+                          ),
+                        
+                        ),
+                      );
+                    },
+                    style: OutlinedButton.styleFrom(
+                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+                      minimumSize: Size(0, 24),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      side: BorderSide(color: theme.colorScheme.primary, width: 1),
+                    ),
+                    child: Text(
+                      'Modifier',
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: theme.colorScheme.primary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
-        ],
-      ),
-    );
-  }
-
+        ),
+      ],
+    ),
+  );
+}
   Widget _buildSocialAction({
     required IconData icon,
     required String text,

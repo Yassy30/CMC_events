@@ -443,5 +443,9 @@ Future<String> createEvent({
       return false;
     }
   }
+
+  updateEvent({required String id, required String title, required String description, required DateTime startDate, required String location, required String category, required String paymentType, double? ticketPrice, int? maxAttendees, required String imageUrl}) {}
+
+  deleteEvent(String id) {}
 }
 

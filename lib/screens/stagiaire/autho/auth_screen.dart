@@ -1,3 +1,4 @@
+import 'package:cmc_ev/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:cmc_ev/services/auth_service.dart';
@@ -151,7 +152,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
                           style: TextStyle(
                             fontSize: 36,
                             fontWeight: FontWeight.bold,
-                            color: Colors.teal[400],
+                            color: AppTheme.primaryColor,
                           ),
                         ),
                         const SizedBox(height: 20),
@@ -257,7 +258,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(20),
                                   ),
-                                  backgroundColor: Colors.teal[400],
+                                  backgroundColor: AppTheme.primaryColor,
                                   foregroundColor: Colors.white,
                                 ),
                                 child: _isLoading
@@ -311,7 +312,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
                                 child: Text(
                                   _isLogin ? 'You Don\'t have account? Sign Up' : 'Already have an account? Log In',
                                   style: TextStyle(
-                                    color: Colors.teal[400],
+                                    color: AppTheme.primaryColor,
                                     fontWeight: FontWeight.w600,
                                   ),
                                 ),
@@ -343,7 +344,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
       controller: controller,
       decoration: InputDecoration(
         labelText: label,
-        prefixIcon: Icon(icon, color: Colors.teal[400]),
+        prefixIcon: Icon(icon, color: AppTheme.primaryColor),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
           borderSide: BorderSide.none,
