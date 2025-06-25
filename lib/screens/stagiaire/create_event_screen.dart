@@ -47,8 +47,8 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   final Map<String, String> _categories = {
     'culture': 'Art & Design',
     'sport': 'Sports',
-    'competition': 'Gaming',
-    'music': 'Music',
+    'competition': 'Competition',
+    'music': 'Culture',
     'tech': 'Tech',
     'other': 'Other',
   };
